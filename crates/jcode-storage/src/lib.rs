@@ -166,7 +166,46 @@ pub fn jcode_dir() -> Result<PathBuf> {
     }
 
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("No home directory"))?;
-    Ok(home.join(".jcode"))
+    let path = home.join(".jcode");
+    cleanup_legacy_root_dirt(&path);
+    Ok(path)
+}
+
+static CLEANUP_ONCE: std::sync::Once = std::sync::Once::new();
+
+pub fn cleanup_legacy_root_dirt(root: &std::path::Path) {
+    CLEANUP_ONCE.call_once(|| {
+        if !root.exists() {
+            return;
+        }
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default();
+
+            // Clean up legacy telemetry files and directories from root
+            if file_name.starts_with("telemetry") || file_name == "no_telemetry" {
+                if path.is_file() {
+                    let _ = std::fs::remove_file(&path);
+                } else if path.is_dir() {
+                    let _ = std::fs::remove_dir_all(&path);
+                }
+            }
+            // Clean up root .bak files, .stamp files, and obsolete transient hint files
+            if file_name.ends_with(".bak")
+                || file_name.ends_with(".stamp")
+                || file_name == "setup_hints.json"
+                || file_name == "remote_header_hint.json"
+            {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    });
 }
 
 /// Whether `JCODE_HOME` redirects this process away from the user's real

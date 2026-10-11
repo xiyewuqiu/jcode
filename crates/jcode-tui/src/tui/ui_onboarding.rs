@@ -350,7 +350,7 @@ fn import_two_column_lines(prompt: &crate::tui::LoginImportPrompt) -> Vec<Line<'
 /// Welcome title line, rendered above the phase body.
 fn welcome_title_line() -> Line<'static> {
     Line::from(Span::styled(
-        "Welcome to jcode onboarding",
+        "欢迎使用 jcode",
         Style::default()
             .fg(welcome_accent())
             .add_modifier(Modifier::BOLD),
@@ -363,7 +363,7 @@ fn welcome_title_line() -> Line<'static> {
 /// what is selectable, so a one-liner is enough.
 fn keyboard_hint_line() -> Line<'static> {
     Line::from(Span::styled(
-        "Use your keyboard to navigate.",
+        "使用键盘方向键或快捷键进行操作。",
         Style::default().fg(dim_color()),
     ))
     .alignment(Alignment::Center)
@@ -457,7 +457,7 @@ fn welcome_body_lines(app: &dyn TuiState) -> Vec<Line<'static>> {
                 None => {
                     lines.push(
                         Line::from(Span::styled(
-                            "First, log in to get started.",
+                            "开始前，请先配置模型供应商 API 凭据。",
                             Style::default()
                                 .fg(welcome_accent())
                                 .add_modifier(Modifier::BOLD),
@@ -466,7 +466,7 @@ fn welcome_body_lines(app: &dyn TuiState) -> Vec<Line<'static>> {
                     );
                     lines.push(
                         Line::from(Span::styled(
-                            "Press Enter to pick who to log in with (OpenAI, Anthropic, and more).",
+                            "可在 ~/.jcode/providers/ 下直接编辑 JSON 配置文件。",
                             Style::default().fg(dim_color()),
                         ))
                         .alignment(align),

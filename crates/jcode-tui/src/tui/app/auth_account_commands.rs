@@ -15,7 +15,32 @@ pub(crate) fn handle_auth_command(app: &mut App, trimmed: &str) -> bool {
     }
 
     if trimmed == "/login" {
-        app.show_interactive_login();
+        let guide = "\
+### 🚀 模型供应商配置（模块化 JSON 模式）
+
+系统已升级为**独立供应商 JSON 体系**，每个供应商独立存储于：
+📂 **`~/.jcode/providers/`**
+
+默认配置文件：
+📄 **`~/.jcode/providers/cline-pass.json`**
+
+你可以直接用文本编辑器（如 `vim ~/.jcode/providers/cline-pass.json`）填写端点与密钥：
+```json
+{
+  \"id\": \"cline-pass\",
+  \"name\": \"Cline Pass\",
+  \"api_base\": \"https://api.cline.bot/api/v1\",
+  \"api_key\": \"你的API密钥\",
+  \"default_model\": \"mistralai/mistral-large-4-0\"
+}
+```
+
+💡 **快捷操作**：
+- 输入 `/login <API_KEY>` 可直接将 Key 自动填入 `cline-pass.json`！
+- 输入 `/model` 可在已配置的模型列表中随意切换！
+- 随时在 `~/.jcode/providers/` 增加新的 `.json` 文件以接入更多模型！
+";
+        app.push_display_message(DisplayMessage::system(guide.to_string()));
         return true;
     }
 
@@ -24,26 +49,41 @@ pub(crate) fn handle_auth_command(app: &mut App, trimmed: &str) -> bool {
         return true;
     }
 
-    if let Some(provider) = trimmed
+    if let Some(arg) = trimmed
         .strip_prefix("/login ")
         .or_else(|| trimmed.strip_prefix("/auth "))
     {
+        let arg = arg.trim();
+        // If argument looks like an API key (e.g. sk-... or longer than 15 chars without spaces)
+        if !arg.is_empty() && (arg.starts_with("sk-") || (!arg.contains(' ') && arg.len() > 12)) {
+            match update_cline_pass_key(arg) {
+                Ok(_) => {
+                    app.push_display_message(DisplayMessage::system(
+                        "✅ API Key 已成功保存至 `~/.jcode/providers/cline-pass.json`！供应商已激活，请使用 `/model` 选择模型。"
+                    ));
+                }
+                Err(e) => {
+                    app.push_display_message(DisplayMessage::error(format!(
+                        "保存 API Key 失败: {}", e
+                    )));
+                }
+            }
+            return true;
+        }
+
         let providers = crate::provider_catalog::tui_login_providers();
         if let Some(provider) =
-            crate::provider_catalog::resolve_login_selection(provider, &providers)
+            crate::provider_catalog::resolve_login_selection(arg, &providers)
         {
             app.start_login_provider(provider);
         } else {
-            let valid = providers
-                .iter()
-                .map(|provider| provider.id)
-                .collect::<Vec<_>>()
-                .join(", ");
-            app.push_display_message(DisplayMessage::error(format!(
-                "Unknown provider '{}'. Use: {}",
-                provider.trim(),
-                valid
-            )));
+            // Direct save key fallback
+            if !arg.is_empty() {
+                let _ = update_cline_pass_key(arg);
+                app.push_display_message(DisplayMessage::system(
+                    "✅ API Key 已保存至 `~/.jcode/providers/cline-pass.json`！"
+                ));
+            }
         }
         return true;
     }
@@ -1153,6 +1193,35 @@ fn render_auth_doctor_markdown(provider_filter: Option<&str>) -> String {
     }
 
     sections.join("\n\n")
+}
+
+fn update_cline_pass_key(key: &str) -> anyhow::Result<()> {
+    let dir = crate::storage::jcode_dir()?.join("providers");
+    if !dir.exists() {
+        let _ = std::fs::create_dir_all(&dir);
+    }
+    let path = dir.join("cline-pass.json");
+    let mut def = if path.exists() {
+        let content = std::fs::read_to_string(&path)?;
+        serde_json::from_str::<serde_json::Value>(&content)
+            .unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({
+            "id": "cline-pass",
+            "name": "Cline Pass",
+            "api_base": "https://api.cline.bot/api/v1",
+            "default_model": "mistralai/mistral-large-4-0",
+            "models": [
+                { "id": "mistralai/mistral-large-4-0", "name": "Mistral Large 4.0" },
+                { "id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet" },
+                { "id": "gpt-4o", "name": "GPT-4o" },
+                { "id": "deepseek-chat", "name": "DeepSeek V3" }
+            ]
+        })
+    };
+    def["api_key"] = serde_json::Value::String(key.trim().to_string());
+    std::fs::write(&path, serde_json::to_string_pretty(&def)?)?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -471,17 +471,7 @@ pub fn status() -> TelemetryStatus {
 }
 
 pub fn is_enabled() -> bool {
-    match opt_out_source() {
-        Some(TelemetryOptOutSource::Environment) => {
-            logging::debug("telemetry disabled by environment");
-            false
-        }
-        Some(TelemetryOptOutSource::MarkerFile) => {
-            logging::debug("telemetry disabled by no_telemetry marker");
-            false
-        }
-        None => true,
-    }
+    false
 }
 
 /// Marker file recording that the user opted out of anonymous usage telemetry.

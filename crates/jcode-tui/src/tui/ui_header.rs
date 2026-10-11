@@ -804,7 +804,7 @@ fn build_persistent_header_with_auth(
     // wraps when the render area subtracts side margins.
     let fit_width = w.saturating_sub(4);
     if !model_is_placeholder && !nice_model.is_empty() {
-        let hint = "/model to switch · ";
+        let hint = "/model 切换模型 · ";
         if model_line_len + hint.chars().count() <= fit_width {
             model_line_len += hint.chars().count();
             model_spans.push(Span::styled(
@@ -842,9 +842,9 @@ fn build_persistent_header_with_auth(
         let version_text = if is_running_stable_release() {
             let tag = jcode_build_meta::git_tag();
             if tag.is_empty() || tag.contains('-') {
-                format!("{} · release", semver())
+                format!("{} · 正式版", semver())
             } else {
-                format!("{} · release {}", semver(), tag)
+                format!("{} · 正式版 {}", semver(), tag)
             }
         } else {
             semver().to_string()
@@ -878,15 +878,39 @@ fn build_header_lines_with_auth(
     // Auth inventory: `/login` heading, then one provider per line (dim
     // hollow dot for unconfigured providers).
     let (login_heading, auth_lines) = if let Some(host) = crate::tui::ssh_remote_host() {
-        // The native protocol reports the active route, not a complete remote
-        // credential inventory. Do not render the laptop's (or an empty)
-        // inventory as if it described providers configured on the server.
-        (format!("/login to authenticate on {host}"), Vec::new())
+        (format!("/login 认证远程主机 {host}"), Vec::new())
     } else {
-        (
-            "/login to add provider".to_string(),
-            build_auth_status_lines(auth, active),
-        )
+        let json_providers = jcode_base::config::providers_loader::load_providers_from_directory();
+        if !json_providers.is_empty() {
+            let mut p_lines = Vec::new();
+            for (name, p_cfg) in json_providers {
+                let has_key = p_cfg
+                    .api_key
+                    .as_ref()
+                    .map(|k| !k.trim().is_empty())
+                    .unwrap_or(false);
+                let state = if has_key {
+                    AuthState::Available
+                } else {
+                    AuthState::NotConfigured
+                };
+                let label = if has_key {
+                    format!("{name} (已配置密钥)")
+                } else {
+                    format!("{name} (未配置密钥，输入 /login <KEY> 设置)")
+                };
+                p_lines.push(Line::from(vec![
+                    Span::styled(auth_dot_char(state), Style::default().fg(auth_dot_color(state))),
+                    Span::styled(format!(" {}", label), Style::default().fg(dim_color())),
+                ]));
+            }
+            ("/login 配置供应商密钥".to_string(), p_lines)
+        } else {
+            (
+                "/login 配置供应商密钥".to_string(),
+                build_auth_status_lines(auth, active),
+            )
+        }
     };
     lines.push(
         Line::from(Span::styled(
@@ -907,7 +931,7 @@ fn build_header_lines_with_auth(
             .take(MAX_MCPS)
             .map(|(name, count)| {
                 if *count > 0 {
-                    format!("{} ({} tools)", name, count)
+                    format!("{} ({} 工具)", name, count)
                 } else {
                     format!("{} (…)", name)
                 }
@@ -915,10 +939,10 @@ fn build_header_lines_with_auth(
             .collect();
         let mut mcp_text = format!("mcp: {}", shown.join(", "));
         if mcps.len() > MAX_MCPS {
-            mcp_text.push_str(&format!(" +{} more", mcps.len() - MAX_MCPS));
+            mcp_text.push_str(&format!(" +{} 更多", mcps.len() - MAX_MCPS));
         }
         if mcp_text.chars().count() > w {
-            mcp_text = format!("mcp: {} servers", mcps.len());
+            mcp_text = format!("mcp: {} 个服务", mcps.len());
         }
         lines.push(
             Line::from(Span::styled(mcp_text, Style::default().fg(dim_color()))).alignment(align),
@@ -933,12 +957,12 @@ fn build_header_lines_with_auth(
             .take(MAX_SKILLS)
             .map(|s| format!("/{}", s))
             .collect();
-        let mut skills_text = format!("skills: {}", shown.join(" "));
+        let mut skills_text = format!("技能: {}", shown.join(" "));
         if skills.len() > MAX_SKILLS {
-            skills_text.push_str(&format!(" +{} more", skills.len() - MAX_SKILLS));
+            skills_text.push_str(&format!(" +{} 更多", skills.len() - MAX_SKILLS));
         }
         if skills_text.chars().count() > w {
-            skills_text = format!("skills: {} loaded", skills.len());
+            skills_text = format!("技能: {} 个已加载", skills.len());
         }
         lines.push(
             Line::from(Span::styled(skills_text, Style::default().fg(dim_color())))
@@ -998,7 +1022,7 @@ pub(super) fn build_updates_box_lines(width: u16, max_lines: usize) -> Vec<Line<
     if has_more {
         content.push(Line::from(Span::styled(
             format!(
-                "  …{} more · /changelog to see all",
+                "  …还有 {} 项 · 输入 /changelog 查看全部",
                 new_entries.len() - display_count
             ),
             Style::default().fg(dim_color()),
@@ -1009,7 +1033,7 @@ pub(super) fn build_updates_box_lines(width: u16, max_lines: usize) -> Vec<Line<
     }
 
     render_rounded_box(
-        "Updates",
+        "更新日志",
         content,
         w.saturating_sub(2),
         Style::default().fg(dim_color()),

@@ -269,11 +269,11 @@ impl App {
         // (`onboarding_welcome_kind`) so it survives in remote mode.
         if had_imports {
             self.set_status_notice(
-                "Welcome to jcode: review detected logins (arrows/hl to move, Enter to choose)",
+                "欢迎使用 jcode：按方向键浏览已检测到的凭证，回车确认选择",
             );
         } else {
             self.set_status_notice(
-                "Log in to OpenAI? Yes/No - hl to move, Enter to choose (No skips for now)",
+                "是否配置模型供应商？按左右键切换，回车确认，选择否暂时跳过",
             );
         }
     }
@@ -931,7 +931,7 @@ impl App {
             shown_at: Instant::now(),
         });
         self.onboarding_prefetch_recent_project();
-        self.set_status_notice("Press any key to switch, Enter to choose");
+        self.set_status_notice("按任意键切换，回车确认选择");
     }
 
     /// Formatted copy shown above the two first-run actions.
@@ -941,11 +941,11 @@ impl App {
         let accent = crate::tui::color_support::rgb(186, 139, 255);
         vec![
             Line::from(vec![Span::styled(
-                "Welcome to jcode 🎉",
+                "欢迎使用 jcode 🎉",
                 Style::default().fg(accent).add_modifier(Modifier::BOLD),
             )]),
             Line::from(vec![Span::styled(
-                "How would you like to begin?",
+                "你想从哪里开始？",
                 Style::default().fg(Color::White),
             )]),
         ]

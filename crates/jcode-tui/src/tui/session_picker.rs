@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Label for the first-run suggested review action.
-const ONBOARDING_REVIEW_LABEL: &str = "Find bugs in my most active repo";
+const ONBOARDING_REVIEW_LABEL: &str = "排查我最活跃项目中的缺陷";
 
 pub use jcode_tui_session_picker::{
     PickerItem, PreviewMessage, ResumeTarget, ServerGroup, SessionFilterMode, SessionInfo,
@@ -2182,9 +2182,9 @@ impl SessionPicker {
                     },
                     None => dir,
                 };
-                format!("New session in {shown}")
+                format!("在 {shown} 开启新会话")
             }
-            None => "New session in the current directory".to_string(),
+            None => "在当前目录开启新会话".to_string(),
         }
     }
 
@@ -2260,7 +2260,7 @@ impl SessionPicker {
         let review = action_spans(ONBOARDING_REVIEW_LABEL, review_selected);
         let start_label = self.onboarding_start_new_label();
         let start = action_spans(&start_label, start_selected);
-        let or_span = || Span::styled("or", Style::default().fg(rgb(130, 134, 142)));
+        let or_span = || Span::styled("或", Style::default().fg(rgb(130, 134, 142)));
 
         let width_of =
             |spans: &[Span<'static>]| -> u16 { spans.iter().map(|s| s.width() as u16).sum() };

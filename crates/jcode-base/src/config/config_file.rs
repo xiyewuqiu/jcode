@@ -19,10 +19,11 @@ impl Config {
         jcode_dir().ok().map(|d| d.join("config.toml"))
     }
 
-    /// Load config from file, with environment variable overrides
+    /// Load config from file, with environment variable overrides and modular providers
     pub fn load() -> Self {
         let mut config = Self::load_from_file().unwrap_or_default();
         config.apply_env_overrides();
+        config.merge_providers_from_directory();
         config
     }
 
@@ -33,7 +34,26 @@ impl Config {
     pub fn load_strict() -> anyhow::Result<Self> {
         let mut config = Self::load_from_file_strict()?.unwrap_or_default();
         config.apply_env_overrides();
+        config.merge_providers_from_directory();
         Ok(config)
+    }
+
+    pub fn merge_providers_from_directory(&mut self) {
+        let loaded = super::providers_loader::load_providers_from_directory();
+        for (id, provider_cfg) in loaded {
+            let has_key = provider_cfg.api_key.is_some();
+            // Automatically promote this provider as default if none is set or current default has no credentials
+            if (self.provider.default_provider.as_deref().map_or(true, |p| p.trim().is_empty())
+                || self.provider.default_provider.as_deref() == Some("openai"))
+                && has_key
+            {
+                self.provider.default_provider = Some(id.clone());
+                if let Some(def_m) = &provider_cfg.default_model {
+                    self.provider.default_model = Some(def_m.clone());
+                }
+            }
+            self.providers.insert(id, provider_cfg);
+        }
     }
 
     /// Load the on-disk config for a read-modify-write operation.

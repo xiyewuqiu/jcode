@@ -1385,6 +1385,7 @@ fn onboarding_banner_renders_actions_side_by_side_with_or() {
     let lines = render_onboarding_picker_lines(&mut picker, 120, 40);
     let text = lines.join("\n");
 
+
     assert!(text.contains("Welcome to jcode"), "{lines:#?}");
     assert!(
         !text.contains("Start in the current directory"),
@@ -1401,15 +1402,16 @@ fn onboarding_banner_renders_actions_side_by_side_with_or() {
 
     let row = lines
         .iter()
-        .position(|line| line.contains("Find bugs in my most active repo"))
+        .position(|line| line.replace(' ', "").contains("排查我最活跃项目中的缺陷"))
         .expect("review action");
     let line = &lines[row];
-    let review_x = line.find("Find bugs in my most active repo").unwrap();
-    let or_x = line
-        .find(" or ")
-        .expect("'or' between the actions on the same row");
-    let start_x = line
-        .find("New session in /srv/projects/demo")
+    let clean = line.replace(' ', "");
+    let review_x = clean.find("排查我最活跃项目中的缺陷").unwrap();
+    let or_x = clean
+        .find("或")
+        .expect("'或' between the actions on the same row");
+    let start_x = clean
+        .find("在/srv/projects/demo开启新会话")
         .expect("start action names the directory, on the same row");
     assert!(review_x < or_x && or_x < start_x, "{lines:#?}");
 
@@ -1431,15 +1433,15 @@ fn onboarding_banner_stacks_actions_when_narrow() {
 
     let review_y = lines
         .iter()
-        .position(|line| line.contains("Find bugs in my most active repo"))
+        .position(|line| line.replace(' ', "").contains("排查我最活跃项目中的缺陷"))
         .expect("review action");
     let or_y = lines
         .iter()
-        .position(|line| line.trim() == "or")
-        .expect("'or' on its own line");
+        .position(|line| line.trim() == "或")
+        .expect("'或' on its own line");
     let start_y = lines
         .iter()
-        .position(|line| line.contains("New session in /srv/projects/demo"))
+        .position(|line| line.replace(' ', "").contains("在/srv/projects/demo开启新会话"))
         .expect("start action");
     assert_eq!(or_y, review_y + 1, "{lines:#?}");
     assert_eq!(start_y, review_y + 2, "{lines:#?}");
@@ -2636,7 +2638,7 @@ fn onboarding_start_label_marks_home_directory() {
     assert!(
         lines
             .iter()
-            .any(|line| line.contains("New session in ~ (home)")),
+            .any(|line| line.contains("在 ~ (home) 开启新会话")),
         "home directory should read '~ (home)': {lines:#?}"
     );
 }
