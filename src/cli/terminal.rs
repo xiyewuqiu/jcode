@@ -8,6 +8,7 @@ pub struct TuiRuntimeState {
     mouse_capture: bool,
     keyboard_enhanced: bool,
     focus_change: bool,
+    alternate_screen: bool,
 }
 
 const INHERITED_MODES_ENV: &str = "JCODE_TUI_INHERITED_MODES";
@@ -47,15 +48,17 @@ struct InheritedTerminalModes {
     mouse_capture: bool,
     keyboard_enhanced: bool,
     focus_change: bool,
+    alternate_screen: bool,
 }
 
 impl InheritedTerminalModes {
     fn encode(self) -> String {
         format!(
-            "mouse={},keyboard={},focus={}",
+            "mouse={},keyboard={},focus={},alt={}",
             u8::from(self.mouse_capture),
             u8::from(self.keyboard_enhanced),
-            u8::from(self.focus_change)
+            u8::from(self.focus_change),
+            u8::from(self.alternate_screen)
         )
     }
 
@@ -64,6 +67,7 @@ impl InheritedTerminalModes {
             mouse_capture: false,
             keyboard_enhanced: false,
             focus_change: false,
+            alternate_screen: true,
         };
         let mut seen = 0u8;
         for field in value.split(',') {
@@ -85,6 +89,9 @@ impl InheritedTerminalModes {
                 "focus" => {
                     modes.focus_change = enabled;
                     seen |= 4;
+                }
+                "alt" => {
+                    modes.alternate_screen = enabled;
                 }
                 _ => return None,
             }
@@ -343,19 +350,28 @@ mod crash_resume_hint_tests {
     }
 }
 
-fn init_tui_terminal(inherited_terminal: bool) -> Result<ratatui::DefaultTerminal> {
+fn init_tui_terminal(inherited_terminal: bool, fullscreen: bool) -> Result<ratatui::DefaultTerminal> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
         anyhow::bail!("jcode TUI requires an interactive terminal (stdin/stdout must be a TTY)");
     }
     if inherited_terminal {
-        init_tui_terminal_resume()
-    } else {
+        init_tui_terminal_resume(fullscreen)
+    } else if fullscreen {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(ratatui::init)).map_err(|payload| {
             anyhow::anyhow!(
                 "failed to initialize terminal: {}",
                 panic_payload_to_string(payload.as_ref())
             )
         })
+    } else {
+        // Scrollback native mode: do NOT use Alternate Screen Buffer.
+        // Enable raw mode and attach ratatui Terminal directly on the primary screen.
+        // Do NOT clear the terminal so previous shell history and output are preserved!
+        crossterm::terminal::enable_raw_mode()
+            .map_err(|e| anyhow::anyhow!("failed to enable raw mode: {}", e))?;
+        let backend = ratatui::backend::CrosstermBackend::new(io::stdout());
+        ratatui::Terminal::new(backend)
+            .map_err(|e| anyhow::anyhow!("failed to create terminal: {}", e))
     }
 }
 
@@ -380,12 +396,14 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         // The OSC 11 query needs the cooked terminal and must happen before init.
         crate::tui::theme_detect::init_theme_mode();
     }
-    let terminal = init_tui_terminal(inherited_terminal)?;
+    let perf_policy = crate::perf::tui_policy();
+    let fullscreen = perf_policy.fullscreen_transcript;
+
+    let terminal = init_tui_terminal(inherited_terminal, fullscreen)?;
     crate::tui::mermaid::install_jcode_mermaid_hooks();
     crate::tui::markdown::install_jcode_markdown_hooks();
     crate::tui::mermaid::init_picker();
 
-    let perf_policy = crate::perf::tui_policy();
     // These private handoff values apply only to this exec boundary. Avoid
     // leaking them into tools or unrelated child jcode processes.
     crate::env::remove_var(INHERITED_MODES_ENV);
@@ -395,6 +413,7 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         mouse_capture: perf_policy.enable_mouse_capture,
         keyboard_enhanced: perf_policy.enable_keyboard_enhancement,
         focus_change: perf_policy.enable_focus_change,
+        alternate_screen: fullscreen,
     };
     let modes = if inherited_terminal {
         // The previous process intentionally preserved these modes across exec.
@@ -432,6 +451,7 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
             mouse_capture: perf_policy.enable_mouse_capture,
             keyboard_enhanced,
             focus_change: perf_policy.enable_focus_change,
+            alternate_screen: fullscreen,
         };
         crossterm::execute!(std::io::stdout(), crossterm::event::EnableBracketedPaste)?;
         if modes.focus_change {
@@ -449,7 +469,7 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
     };
 
     crate::logging::info(&format!(
-        "EVENT event=TUI_TERMINAL_MODES phase=initialized pid={} resuming={} handoff={} handoff_raw={} raw_mode={} mouse_capture={} keyboard_enhanced={} focus_change={} idempotent_modes_reasserted={}",
+        "EVENT event=TUI_TERMINAL_MODES phase=initialized pid={} resuming={} handoff={} handoff_raw={} raw_mode={} mouse_capture={} keyboard_enhanced={} focus_change={} alt_screen={} idempotent_modes_reasserted={}",
         std::process::id(),
         is_resuming,
         inherited_terminal,
@@ -458,6 +478,7 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         modes.mouse_capture,
         modes.keyboard_enhanced,
         modes.focus_change,
+        modes.alternate_screen,
         inherited_terminal,
     ));
 
@@ -467,6 +488,7 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
             mouse_capture: modes.mouse_capture,
             keyboard_enhanced: modes.keyboard_enhanced,
             focus_change: modes.focus_change,
+            alternate_screen: modes.alternate_screen,
         }),
     ))
 }
@@ -506,7 +528,12 @@ fn cleanup_tui_runtime(state: &TuiRuntimeState, restore_terminal: bool) {
         if state.keyboard_enhanced {
             tui::disable_keyboard_enhancement();
         }
-        jcode_tui_style::restore_terminal_quietly();
+        if state.alternate_screen {
+            jcode_tui_style::restore_terminal_quietly();
+        } else {
+            let _ = crossterm::execute!(std::io::stdout(), crossterm::cursor::Show);
+            let _ = crossterm::terminal::disable_raw_mode();
+        }
     }
 }
 
@@ -531,6 +558,7 @@ fn export_tui_exec_handoff(state: &TuiRuntimeState) {
         mouse_capture: state.mouse_capture,
         keyboard_enhanced: state.keyboard_enhanced,
         focus_change: state.focus_change,
+        alternate_screen: state.alternate_screen,
     };
     crate::env::set_var(INHERITED_MODES_ENV, modes.encode());
     let theme = crate::tui::theme_detect::current_theme_label();
@@ -565,7 +593,7 @@ fn write_session_resume_hint(mut writer: impl Write, session_id: &str) -> io::Re
     Ok(())
 }
 
-fn init_tui_terminal_resume() -> Result<ratatui::DefaultTerminal> {
+fn init_tui_terminal_resume(fullscreen: bool) -> Result<ratatui::DefaultTerminal> {
     use ratatui::{Terminal, backend::CrosstermBackend};
 
     crossterm::terminal::enable_raw_mode()
@@ -575,9 +603,11 @@ fn init_tui_terminal_resume() -> Result<ratatui::DefaultTerminal> {
     let mut terminal = Terminal::new(backend)
         .map_err(|e| anyhow::anyhow!("failed to create terminal on resume: {}", e))?;
 
-    terminal
-        .clear()
-        .map_err(|e| anyhow::anyhow!("failed to clear terminal on resume: {}", e))?;
+    if fullscreen {
+        terminal
+            .clear()
+            .map_err(|e| anyhow::anyhow!("failed to clear terminal on resume: {}", e))?;
+    }
 
     Ok(terminal)
 }
@@ -804,6 +834,7 @@ mod tests {
             mouse_capture: false,
             keyboard_enhanced: false,
             focus_change: false,
+            alternate_screen: false,
         })
     }
 
@@ -813,6 +844,7 @@ mod tests {
             mouse_capture: true,
             keyboard_enhanced: false,
             focus_change: true,
+            alternate_screen: true,
         };
         assert_eq!(InheritedTerminalModes::decode(&modes.encode()), Some(modes));
     }
@@ -848,6 +880,7 @@ mod tests {
             mouse_capture: true,
             keyboard_enhanced: true,
             focus_change: true,
+            alternate_screen: true,
         };
         assert!(has_terminal_exec_handoff(true, Some(modes)));
         assert!(!has_terminal_exec_handoff(true, None));

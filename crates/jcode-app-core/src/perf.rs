@@ -88,6 +88,7 @@ pub struct TuiPerfPolicy {
     pub enable_focus_change: bool,
     pub enable_mouse_capture: bool,
     pub enable_keyboard_enhancement: bool,
+    pub fullscreen_transcript: bool,
     pub simplified_model_picker: bool,
     pub linked_side_panel_refresh_interval: std::time::Duration,
 }
@@ -206,7 +207,6 @@ pub fn tui_policy_for(
     let mut animation_fps = display.animation_fps.clamp(1, 120);
     let mut enable_decorative_animations = !matches!(profile.tier, PerformanceTier::Minimal);
     let mut enable_focus_change = true;
-    let enable_mouse_capture = display.mouse_capture;
     let mut enable_keyboard_enhancement = true;
     let mut simplified_model_picker = false;
     let mut linked_side_panel_refresh_interval = std::time::Duration::from_millis(250);
@@ -257,6 +257,34 @@ pub fn tui_policy_for(
         }
     }
 
+    let env_fullscreen = std::env::var("JCODE_FULLSCREEN_TRANSCRIPT")
+        .ok()
+        .and_then(|v| match v.trim().to_ascii_lowercase().as_str() {
+            "0" | "false" | "off" | "no" => Some(false),
+            "1" | "true" | "on" | "yes" => Some(true),
+            _ => None,
+        })
+        .or_else(|| {
+            if std::env::var("JCODE_SCROLLBACK").is_ok() {
+                Some(false)
+            } else {
+                None
+            }
+        });
+    let fullscreen_transcript = env_fullscreen.unwrap_or(display.fullscreen_transcript);
+
+    // Over SSH or in Scrollback mode, NEVER capture mouse so native terminal scroll & selection work!
+    let enable_mouse_capture = if !fullscreen_transcript || profile.is_ssh {
+        false
+    } else {
+        display.mouse_capture
+    };
+
+    if profile.is_ssh {
+        redraw_fps = redraw_fps.min(10);
+        enable_focus_change = false;
+    }
+
     if !enable_decorative_animations {
         animation_fps = 1;
     }
@@ -269,6 +297,7 @@ pub fn tui_policy_for(
         enable_focus_change,
         enable_mouse_capture,
         enable_keyboard_enhancement,
+        fullscreen_transcript,
         simplified_model_picker,
         linked_side_panel_refresh_interval,
     }

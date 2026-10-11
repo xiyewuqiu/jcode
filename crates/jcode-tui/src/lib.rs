@@ -21,6 +21,7 @@
 // re-exports `jcode-base`) so `crate::<module>` paths resolve here exactly as
 // they did before the split.
 pub use jcode_app_core::*;
+pub use jcode_i18n;
 
 // Presentation layer (kept in this crate).
 pub mod tui;

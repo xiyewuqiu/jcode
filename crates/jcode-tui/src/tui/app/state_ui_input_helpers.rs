@@ -239,6 +239,7 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::hidden("/zz", "Secret premium-mode command"),
     RegisteredCommand::hidden("/zzz", "Secret premium-mode command"),
     RegisteredCommand::hidden("/zstatus", "Secret premium-mode status command"),
+    RegisteredCommand::public("/lang", "Switch UI language (zh/en)"),
 ];
 
 /// Every non-hidden slash command with its one-line description, in
@@ -249,7 +250,7 @@ pub(crate) fn registered_command_entries() -> impl Iterator<Item = (&'static str
     REGISTERED_COMMANDS
         .iter()
         .filter(|command| !command.hidden)
-        .map(|command| (command.name, command.help))
+        .map(|command| (command.name, jcode_i18n::t_command(command.name, command.help)))
 }
 
 pub(crate) fn registered_command_names() -> impl Iterator<Item = &'static str> {
@@ -377,7 +378,7 @@ impl App {
             for skill in skills.list() {
                 let command = format!("/{}", skill.name);
                 if seen.insert(command.clone()) {
-                    commands.push((command, "Activate skill"));
+                    commands.push((command, jcode_i18n::t_ui("Activate skill")));
                 }
             }
         }
@@ -388,7 +389,7 @@ impl App {
             .filter(|command| !command.hidden)
             .filter_map(|command| {
                 let name = command.name.to_string();
-                seen.insert(name.clone()).then_some((name, command.help))
+                seen.insert(name.clone()).then_some((name, jcode_i18n::t_command(command.name, command.help)))
             })
             .collect();
 
@@ -399,7 +400,7 @@ impl App {
             for skill in &self.remote_skills {
                 let command = format!("/{skill}");
                 if seen.insert(command.clone()) {
-                    commands.push((command, "Activate skill"));
+                    commands.push((command, jcode_i18n::t_ui("Activate skill")));
                 }
             }
         }

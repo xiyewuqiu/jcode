@@ -49,8 +49,20 @@ fn composer_mode(input: &str, is_remote_mode: bool) -> ComposerMode {
 
 fn shell_mode_hint(mode: ComposerMode) -> Option<&'static str> {
     match mode {
-        ComposerMode::ShellLocal => Some("  shell mode · Enter runs locally"),
-        ComposerMode::ShellRemote => Some("  shell mode · Enter runs on server"),
+        ComposerMode::ShellLocal => {
+            if jcode_i18n::is_chinese() {
+                Some("  shell 终端模式 · 回车键在本地执行")
+            } else {
+                Some("  shell mode · Enter runs locally")
+            }
+        }
+        ComposerMode::ShellRemote => {
+            if jcode_i18n::is_chinese() {
+                Some("  shell 终端模式 · 回车键在远端服务器执行")
+            } else {
+                Some("  shell mode · Enter runs on server")
+            }
+        }
         _ => None,
     }
 }
@@ -307,8 +319,13 @@ fn command_suggestion_lines(
                 ));
             }
             if i + 1 == limited.len() && more_count > 0 {
+                let more_text = if jcode_i18n::is_chinese() {
+                    format!("  +另有{}个命令", more_count)
+                } else {
+                    format!("  +{} more", more_count)
+                };
                 spans.push(Span::styled(
-                    format!("  +{} more", more_count),
+                    more_text,
                     Style::default().fg(dim_color()),
                 ));
             }
@@ -892,7 +909,8 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 Line::from(spans)
             }
             ProcessingStatus::Thinking(_start) => {
-                let mut label = format!(" thinking… {}", format_elapsed(elapsed));
+                let prefix = if jcode_i18n::is_chinese() { " 思考中… " } else { " thinking… " };
+                let mut label = format!("{}{}", prefix, format_elapsed(elapsed));
                 append_transport_context(&mut label, app);
                 let mut spans = vec![
                     Span::styled(spinner, Style::default().fg(ai_color())),
@@ -940,14 +958,23 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 Line::from(spans)
             }
             ProcessingStatus::WaitingForNetwork { listener } => {
+                let text = if jcode_i18n::is_chinese() {
+                    format!(
+                        "网络已断开，等待重试 · {} · {}",
+                        listener,
+                        format_elapsed(elapsed)
+                    )
+                } else {
+                    format!(
+                        "network disconnected, waiting to retry · {} · {}",
+                        listener,
+                        format_elapsed(elapsed)
+                    )
+                };
                 let mut spans = vec![
                     Span::styled("↻ ", Style::default().fg(rgb(255, 193, 7))),
                     Span::styled(
-                        format!(
-                            "network disconnected, waiting to retry · {} · {}",
-                            listener,
-                            format_elapsed(elapsed)
-                        ),
+                        text,
                         Style::default().fg(rgb(255, 193, 7)),
                     ),
                 ];

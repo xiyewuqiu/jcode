@@ -1747,7 +1747,7 @@ mod reasoning_display_defaults_tests {
             ..DisplayConfig::default()
         };
         assert!(!display.has_explicit_reasoning_display());
-        assert_eq!(display.reasoning_display(), ReasoningDisplayMode::Full);
+        assert_eq!(display.reasoning_display(), ReasoningDisplayMode::Current);
 
         display.set_reasoning_display(ReasoningDisplayMode::Current);
         assert!(display.has_explicit_reasoning_display());

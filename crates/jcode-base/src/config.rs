@@ -498,7 +498,8 @@ pub struct Config {
     /// External dictation / speech-to-text integration
     pub dictation: DictationConfig,
 
-    /// Display/UI configuration
+    /// Display/UI configuration (supports [tui] alias from Codex configs)
+    #[serde(alias = "tui")]
     pub display: DisplayConfig,
 
     /// Feature toggles

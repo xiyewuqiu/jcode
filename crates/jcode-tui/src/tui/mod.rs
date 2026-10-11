@@ -1759,6 +1759,7 @@ pub enum AgentModelTarget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PickerAction {
     Model,
+    Effort,
     Account(AccountPickerAction),
     Login(crate::provider_catalog::LoginProviderDescriptor),
     /// Native SSH actions never dispatch through laptop-local authentication.
@@ -1827,6 +1828,7 @@ impl InlineInteractiveState {
 fn estimate_picker_action_bytes(action: &PickerAction) -> usize {
     match action {
         PickerAction::Model
+        | PickerAction::Effort
         | PickerAction::RemoteLogin { .. }
         | PickerAction::RemoteImportDecision { .. }
         | PickerAction::AgentTarget(_)

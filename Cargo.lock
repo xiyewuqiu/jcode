@@ -3517,6 +3517,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "jcode-i18n"
+version = "0.1.0"
+
+[[package]]
 name = "jcode-import-core"
 version = "0.1.0"
 dependencies = [
@@ -4190,6 +4194,7 @@ dependencies = [
  "jcode-config-types",
  "jcode-core",
  "jcode-fuzzy",
+ "jcode-i18n",
  "jcode-logging",
  "jcode-productivity-core",
  "jcode-provider-core",

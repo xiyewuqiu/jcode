@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="1jehuang/jcode"
-RELEASE_METADATA_BASE="${JCODE_RELEASE_METADATA_BASE:-https://jcode.sh/releases}"
+REPO="${JCODE_REPO:-xiyewuqiu/jcode}"
+RELEASE_METADATA_BASE="${JCODE_RELEASE_METADATA_BASE:-https://github.com/$REPO/releases}"
 IS_WINDOWS=false
 IS_TERMUX=false
 INSTALL_STAGE="startup"
@@ -16,7 +16,7 @@ info() { printf '\033[1;34m%s\033[0m\n' "$*"; }
 err()  { printf '\033[1;31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 
 valid_release_tag() {
-  printf '%s' "$1" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([+.-][[:alnum:].-]+)?$'
+  printf '%s' "$1" | grep -Eq '^(latest|v?[0-9]+\.[0-9]+\.[0-9]+([+.-][[:alnum:].-]+)?)$'
 }
 
 sha256_file() {
@@ -32,45 +32,12 @@ sha256_file() {
   fi
 }
 
-valid_conversion_id() {
-  printf '%s' "${JCODE_INSTALL_CONVERSION_ID:-}" |
-    grep -Eiq '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
-}
-
-telemetry_value() {
-  printf '%s' "$1" | tr -cd '[:alnum:]_. -' | cut -c1-100
-}
-
 report_install_funnel() {
-  stage="$1"
-  outcome="$2"
-  failure_stage="${3:-}"
-  [ "${JCODE_NO_TELEMETRY:-}" != "1" ] || return 0
-  [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
-  valid_conversion_id || return 0
-
-  payload=$(printf '{"id":"%s","event":"install_funnel","version":"%s","os":"%s","arch":"%s","conversion_id":"%s","stage":"%s","outcome":"%s","source":"installer","install_method":"shell","failure_stage":"%s"}' \
-    "$JCODE_INSTALL_CONVERSION_ID" \
-    "$(telemetry_value "$INSTALL_VERSION")" \
-    "$(telemetry_value "$INSTALL_OS")" \
-    "$(telemetry_value "$INSTALL_ARCH")" \
-    "$JCODE_INSTALL_CONVERSION_ID" \
-    "$(telemetry_value "$stage")" \
-    "$(telemetry_value "$outcome")" \
-    "$(telemetry_value "$failure_stage")")
-  curl -fsS --max-time 2 -H 'Content-Type: application/json' \
-    --data "$payload" https://telemetry.jcode.sh/v1/event >/dev/null 2>&1 || true
+  return 0
 }
 
 persist_install_conversion_id() {
-  [ "${JCODE_NO_TELEMETRY:-}" != "1" ] || return 0
-  [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
-  valid_conversion_id || return 0
-  jcode_home="${JCODE_HOME:-$HOME/.jcode}"
-  mkdir -p "$jcode_home" 2>/dev/null || return 0
-  (umask 077; printf '%s\n' "$JCODE_INSTALL_CONVERSION_ID" > "$jcode_home/install_conversion_id") \
-    2>/dev/null || return 0
-  chmod 600 "$jcode_home/install_conversion_id" 2>/dev/null || true
+  return 0
 }
 
 install_exit() {
@@ -155,8 +122,6 @@ fi
 INSTALL_STAGE="release_lookup"
 VERSION="${JCODE_VERSION:-}"
 if [ -z "$VERSION" ]; then
-  METADATA_VERSION=$(curl -fsSL --retry 2 --connect-timeout 10 \
-    "$RELEASE_METADATA_BASE/latest/version" 2>/dev/null | tr -d '\r\n' || true)
   LATEST_RELEASE_URL=$(curl -fsSIL --retry 2 --connect-timeout 10 \
     -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" 2>/dev/null || true)
   case "$LATEST_RELEASE_URL" in
@@ -165,12 +130,15 @@ if [ -z "$VERSION" ]; then
   esac
   if valid_release_tag "$GITHUB_VERSION"; then
     VERSION="$GITHUB_VERSION"
-  elif valid_release_tag "$METADATA_VERSION"; then
-    VERSION="$METADATA_VERSION"
-    info "GitHub release lookup unavailable; using cached jcode.sh metadata ($VERSION)."
+  else
+    GITHUB_API_TAG=$(curl -fsSL --connect-timeout 5 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name":' | head -1 | cut -d '"' -f 4 || true)
+    if valid_release_tag "$GITHUB_API_TAG"; then
+      VERSION="$GITHUB_API_TAG"
+    else
+      VERSION="latest"
+    fi
   fi
 fi
-valid_release_tag "$VERSION" || err "Failed to determine latest version"
 INSTALL_VERSION="${VERSION#v}"
 
 GITHUB_RELEASE_BASE="https://github.com/$REPO/releases/download/$VERSION"
@@ -208,14 +176,13 @@ tmpdir=$(mktemp -d)
 INSTALL_STAGE="artifact_download"
 download_mode=""
 downloaded_asset=""
-DOWNLOAD_BASES=$(curl -fsSL --retry 2 --connect-timeout 10 \
-  "$RELEASE_METADATA_BASE/$VERSION/download-bases" 2>/dev/null || true)
-DOWNLOAD_BASES=$(printf '%s\n%s\n' "$DOWNLOAD_BASES" "$GITHUB_RELEASE_BASE" |
-  awk '/^https:\/\/[^[:space:]]+$/ && !seen[$0]++')
+DOWNLOAD_BASES="https://github.com/$REPO/releases/download/$VERSION
+https://github.com/$REPO/releases/latest/download"
 
-for candidate in "$ARTIFACT.tar.gz" "$ARTIFACT$EXE"; do
+for candidate in "$ARTIFACT.tar.gz" "$ARTIFACT$EXE" "$ARTIFACT"; do
   while IFS= read -r base; do
     [ -n "$base" ] || continue
+    info "Checking download from $base/$candidate ..."
     if curl -fsSL --retry 2 --connect-timeout 10 \
       "${base%/}/$candidate" -o "$tmpdir/jcode.download" 2>/dev/null; then
       downloaded_asset="$candidate"
@@ -234,8 +201,8 @@ if [ -n "$download_mode" ]; then
   INSTALL_STAGE="artifact_verification"
   EXPECTED_SHA256=""
   for checksum_url in \
-    "$RELEASE_METADATA_BASE/$VERSION/SHA256SUMS" \
-    "$GITHUB_RELEASE_BASE/SHA256SUMS"; do
+    "$GITHUB_RELEASE_BASE/SHA256SUMS" \
+    "https://github.com/$REPO/releases/latest/download/SHA256SUMS"; do
     CHECKSUMS=$(curl -fsSL --retry 2 --connect-timeout 10 \
       "$checksum_url" 2>/dev/null || true)
     EXPECTED_SHA256=$(printf '%s\n' "$CHECKSUMS" |
@@ -245,13 +212,16 @@ if [ -n "$download_mode" ]; then
     fi
     EXPECTED_SHA256=""
   done
-  printf '%s' "$EXPECTED_SHA256" | grep -Eq '^[0-9a-f]{64}$' \
-    || err "Could not find a trusted SHA-256 checksum for $downloaded_asset in $VERSION"
-  ACTUAL_SHA256=$(sha256_file "$tmpdir/jcode.download") \
-    || err "sha256sum, shasum, or openssl is required to verify the download"
-  [ "$ACTUAL_SHA256" = "$EXPECTED_SHA256" ] \
-    || err "SHA-256 verification failed for $downloaded_asset"
-  info "Verified SHA-256: $downloaded_asset"
+  if [ -n "$EXPECTED_SHA256" ]; then
+    ACTUAL_SHA256=$(sha256_file "$tmpdir/jcode.download") || true
+    if [ "$ACTUAL_SHA256" = "$EXPECTED_SHA256" ]; then
+      info "Verified SHA-256: $downloaded_asset"
+    else
+      err "SHA-256 verification failed for $downloaded_asset"
+    fi
+  else
+    info "SHA-256 checksum not available, continuing installation."
+  fi
 fi
 
 INSTALL_STAGE="binary_install"

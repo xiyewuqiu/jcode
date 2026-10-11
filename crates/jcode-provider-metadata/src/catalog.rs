@@ -504,7 +504,19 @@ pub const OPENAI_COMPAT_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfi
     requires_api_key: true,
 };
 
-pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 43] = [
+pub const CLINE_PASS_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
+    id: "cline-pass",
+    display_name: "Cline Pass",
+    api_base: "https://api.cline.bot/api/v1",
+    api_key_env: "CLINE_PASS_API_KEY",
+    env_file: "cline-pass.env",
+    setup_url: "https://api.cline.bot",
+    default_model: None,
+    requires_api_key: true,
+};
+
+pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 44] = [
+    CLINE_PASS_PROFILE,
     OPENCODE_PROFILE,
     OPENCODE_GO_PROFILE,
     ZAI_PROFILE,
@@ -1283,7 +1295,21 @@ pub const GOOGLE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescript
     order: LoginProviderSurfaceOrder::new(Some(13), None, None, None, None),
 };
 
-pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 55] = [
+pub const CLINE_PASS_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+    id: "cline-pass",
+    display_name: "Cline Pass",
+    auth_kind: LoginProviderAuthKind::ApiKey,
+    auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
+    auth_status_method: "API key",
+    aliases: &["cline"],
+    menu_detail: "https://api.cline.bot/api/v1",
+    recommended: false,
+    target: LoginProviderTarget::OpenAiCompatible(CLINE_PASS_PROFILE),
+    order: LoginProviderSurfaceOrder::new(Some(23), Some(23), Some(23), Some(23), Some(23)),
+};
+
+pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 56] = [
+    CLINE_PASS_LOGIN_PROVIDER,
     AUTO_IMPORT_LOGIN_PROVIDER,
     CLAUDE_LOGIN_PROVIDER,
     ANTHROPIC_API_LOGIN_PROVIDER,

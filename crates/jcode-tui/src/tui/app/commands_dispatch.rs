@@ -212,6 +212,8 @@ fn dispatch_single_local_command(app: &mut App, trimmed: &str) -> bool {
         if super::commands::handle_cancel_command(app, trimmed)
             || super::commands::handle_help_command(app, trimmed)
             || super::commands::handle_diff_command(app, trimmed)
+            || super::commands::handle_lang_command(app, trimmed)
+            || super::commands::handle_scrollback_command(app, trimmed)
         {
             return true;
         }
@@ -222,6 +224,8 @@ fn dispatch_single_local_command(app: &mut App, trimmed: &str) -> bool {
     }
     super::commands::handle_cancel_command(app, trimmed)
         || super::commands::handle_help_command(app, trimmed)
+        || super::commands::handle_lang_command(app, trimmed)
+        || super::commands::handle_scrollback_command(app, trimmed)
         || super::commands::handle_keys_command(app, trimmed)
         || super::commands::handle_ssh_command(app, trimmed)
         // `/test`, `/mission`, `/goal`, and `/goals` are dispatched inside

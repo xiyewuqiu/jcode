@@ -16,9 +16,6 @@ use super::login::run_login_provider;
 use super::output;
 
 pub(crate) use crate::external_auth::maybe_run_external_auth_auto_import_flow;
-use crate::external_auth::{
-    can_prompt_for_external_auth, external_auth_blocked_message, prompt_to_trust_external_auth,
-};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum ProviderChoice {
@@ -739,6 +736,7 @@ async fn detect_auto_provider_flags() -> AutoProviderAvailability {
     }
 }
 
+#[allow(dead_code)]
 fn provider_label_for_api_key_env(env_key: &str) -> String {
     if env_key == "OPENROUTER_API_KEY" {
         return "OpenRouter".to_string();
@@ -753,6 +751,7 @@ fn provider_label_for_api_key_env(env_key: &str) -> String {
         .unwrap_or_else(|| env_key.to_string())
 }
 
+#[allow(dead_code)]
 fn provider_login_hint_for_api_key_env(env_key: &str) -> String {
     if env_key == "OPENROUTER_API_KEY" {
         return "jcode login --provider openrouter".to_string();
@@ -768,35 +767,11 @@ fn provider_login_hint_for_api_key_env(env_key: &str) -> String {
         .unwrap_or_else(|| "jcode login".to_string())
 }
 
-fn ensure_external_api_key_auth_allowed_for_explicit_choice(env_key: &str) -> Result<()> {
-    if direct_api_key_configured_for_env(env_key) {
-        return Ok(());
-    }
-    let Some(source) = auth::external::preferred_unconsented_api_key_source_for_env(env_key) else {
-        return Ok(());
-    };
-    let path = source.path()?;
-    let provider_name = provider_label_for_api_key_env(env_key);
-    let login_hint = provider_login_hint_for_api_key_env(env_key);
-    if !can_prompt_for_external_auth() {
-        anyhow::bail!(external_auth_blocked_message(
-            &provider_name,
-            source.display_name(),
-            &path,
-            &login_hint,
-        ));
-    }
-    if prompt_to_trust_external_auth(&provider_name, source.display_name(), &path)? {
-        auth::external::trust_external_auth_source(source)?;
-        return Ok(());
-    }
-    anyhow::bail!(
-        "Skipped trusting external {} credentials. Run `{}` to authenticate jcode directly.",
-        provider_name,
-        login_hint
-    )
+fn ensure_external_api_key_auth_allowed_for_explicit_choice(_env_key: &str) -> Result<()> {
+    Ok(())
 }
 
+#[allow(dead_code)]
 fn direct_api_key_configured_for_env(env_key: &str) -> bool {
     let env_key = env_key.trim();
     if env_key.is_empty() {
@@ -819,6 +794,7 @@ fn direct_api_key_configured_for_env(env_key: &str) -> bool {
         .any(|env_file| direct_env_file_contains_key(env_key, &env_file))
 }
 
+#[allow(dead_code)]
 fn direct_env_file_contains_key(env_key: &str, env_file: &str) -> bool {
     if !crate::provider_catalog::is_safe_env_file_name(env_file) {
         return false;
@@ -838,446 +814,65 @@ fn direct_env_file_contains_key(env_key: &str, env_file: &str) -> bool {
     })
 }
 
-fn maybe_enable_external_api_key_auth_for_auto(has_other_provider: bool) -> Result<bool> {
-    if provider::openrouter::has_credentials() {
-        return Ok(true);
-    }
-    if has_other_provider {
-        return Ok(false);
-    }
+fn maybe_enable_external_api_key_auth_for_auto(_has_other_provider: bool) -> Result<bool> {
+    Ok(provider::openrouter::has_credentials())
+}
 
-    for (env_key, _) in crate::provider_catalog::openrouter_like_api_key_sources() {
-        let Some(source) = auth::external::preferred_unconsented_api_key_source_for_env(&env_key)
-        else {
-            continue;
-        };
-        let path = source.path()?;
-        let provider_name = provider_label_for_api_key_env(&env_key);
-        let login_hint = provider_login_hint_for_api_key_env(&env_key);
-        if !can_prompt_for_external_auth() {
-            crate::logging::warn(&external_auth_blocked_message(
-                &provider_name,
-                source.display_name(),
-                &path,
-                &login_hint,
-            ));
-            return Ok(false);
-        }
-        if prompt_to_trust_external_auth(&provider_name, source.display_name(), &path)? {
-            auth::external::trust_external_auth_source(source)?;
-            return Ok(provider::openrouter::has_credentials());
-        }
-        return Ok(false);
-    }
-
+#[allow(dead_code)]
+fn maybe_prompt_for_generic_oauth_source(
+    _provider_name: &str,
+    _source: Option<auth::external::ExternalAuthSource>,
+    _login_hint: &str,
+    _auto: bool,
+    _validation: impl Fn() -> bool,
+) -> Result<bool> {
     Ok(false)
 }
 
-fn maybe_prompt_for_generic_oauth_source(
-    provider_name: &str,
-    source: Option<auth::external::ExternalAuthSource>,
-    login_hint: &str,
-    auto: bool,
-    validation: impl Fn() -> bool,
-) -> Result<bool> {
-    let Some(source) = source else {
-        return Ok(false);
-    };
-    let path = source.path()?;
-    if !can_prompt_for_external_auth() {
-        if auto {
-            crate::logging::warn(&external_auth_blocked_message(
-                provider_name,
-                source.display_name(),
-                &path,
-                login_hint,
-            ));
-            return Ok(false);
-        }
-        anyhow::bail!(external_auth_blocked_message(
-            provider_name,
-            source.display_name(),
-            &path,
-            login_hint,
-        ));
-    }
-    if prompt_to_trust_external_auth(provider_name, source.display_name(), &path)? {
-        auth::external::trust_external_auth_source(source)?;
-        return Ok(if auto { validation() } else { true });
-    }
-    Ok(false)
+
+
+fn maybe_enable_legacy_codex_auth_for_auto(_has_other_provider: bool) -> Result<bool> {
+    Ok(auth::codex::load_credentials().is_ok())
 }
 
 fn ensure_openai_auth_allowed_for_explicit_choice() -> Result<()> {
-    if auth::codex::load_credentials().is_ok() {
-        return Ok(());
-    }
-
-    if maybe_prompt_for_generic_oauth_source(
-        "OpenAI/Codex",
-        auth::external::preferred_unconsented_openai_oauth_source(),
-        "jcode login --provider openai",
-        false,
-        || auth::codex::load_credentials().is_ok(),
-    )? {
-        return Ok(());
-    }
-
-    if !auth::codex::has_unconsented_legacy_credentials() {
-        return Ok(());
-    }
-
-    let path = auth::codex::legacy_auth_file_path()?;
-
-    if !can_prompt_for_external_auth() {
-        anyhow::bail!(external_auth_blocked_message(
-            "OpenAI/Codex",
-            "Codex",
-            &path,
-            "jcode login --provider openai"
-        ));
-    }
-
-    if prompt_to_trust_external_auth("OpenAI/Codex", "Codex", &path)? {
-        auth::codex::trust_legacy_auth_for_future_use()?;
-        return Ok(());
-    }
-
-    anyhow::bail!(
-        "Skipped trusting existing ~/.codex/auth.json credentials. Run `jcode login --provider openai` to authenticate jcode directly."
-    )
-}
-
-fn maybe_enable_legacy_codex_auth_for_auto(has_other_provider: bool) -> Result<bool> {
-    if auth::codex::load_credentials().is_ok() {
-        return Ok(true);
-    }
-
-    if let Some(source) = auth::external::preferred_unconsented_openai_oauth_source() {
-        if has_other_provider {
-            return Ok(false);
-        }
-        return maybe_prompt_for_generic_oauth_source(
-            "OpenAI/Codex",
-            Some(source),
-            "jcode login --provider openai",
-            true,
-            || auth::codex::load_credentials().is_ok(),
-        );
-    }
-
-    if !auth::codex::has_unconsented_legacy_credentials() {
-        return Ok(false);
-    }
-
-    if has_other_provider {
-        return Ok(false);
-    }
-
-    let path = auth::codex::legacy_auth_file_path()?;
-
-    if !can_prompt_for_external_auth() {
-        crate::logging::warn(&external_auth_blocked_message(
-            "OpenAI/Codex",
-            "Codex",
-            &path,
-            "jcode login --provider openai",
-        ));
-        return Ok(false);
-    }
-
-    if prompt_to_trust_external_auth("OpenAI/Codex", "Codex", &path)? {
-        auth::codex::trust_legacy_auth_for_future_use()?;
-        return Ok(auth::codex::load_credentials().is_ok());
-    }
-
-    Ok(false)
+    Ok(())
 }
 
 fn ensure_claude_auth_allowed_for_explicit_choice() -> Result<()> {
-    if auth::claude::load_credentials().is_ok() {
-        return Ok(());
-    }
-
-    if maybe_prompt_for_generic_oauth_source(
-        "Claude",
-        auth::external::preferred_unconsented_anthropic_oauth_source(),
-        "jcode login --provider claude",
-        false,
-        || auth::claude::load_credentials().is_ok(),
-    )? {
-        return Ok(());
-    }
-
-    let Some(source) = auth::claude::has_unconsented_external_auth() else {
-        return Ok(());
-    };
-    let path = source.path()?;
-    if !can_prompt_for_external_auth() {
-        anyhow::bail!(external_auth_blocked_message(
-            "Claude",
-            source.display_name(),
-            &path,
-            "jcode login --provider claude"
-        ));
-    }
-    if prompt_to_trust_external_auth("Claude", source.display_name(), &path)? {
-        auth::claude::trust_external_auth_source(source)?;
-        return Ok(());
-    }
-    anyhow::bail!(
-        "Skipped trusting external Claude credentials. Run `jcode login --provider claude` to authenticate jcode directly."
-    )
+    Ok(())
 }
 
-fn maybe_enable_claude_auth_for_auto(has_other_provider: bool) -> Result<bool> {
-    if auth::claude::load_credentials().is_ok() {
-        return Ok(true);
-    }
-
-    if let Some(source) = auth::external::preferred_unconsented_anthropic_oauth_source() {
-        if has_other_provider {
-            return Ok(false);
-        }
-        return maybe_prompt_for_generic_oauth_source(
-            "Claude",
-            Some(source),
-            "jcode login --provider claude",
-            true,
-            || auth::claude::load_credentials().is_ok(),
-        );
-    }
-
-    let Some(source) = auth::claude::has_unconsented_external_auth() else {
-        return Ok(false);
-    };
-    if has_other_provider {
-        return Ok(false);
-    }
-    let path = source.path()?;
-    if !can_prompt_for_external_auth() {
-        crate::logging::warn(&external_auth_blocked_message(
-            "Claude",
-            source.display_name(),
-            &path,
-            "jcode login --provider claude",
-        ));
-        return Ok(false);
-    }
-    if prompt_to_trust_external_auth("Claude", source.display_name(), &path)? {
-        auth::claude::trust_external_auth_source(source)?;
-        return Ok(auth::claude::load_credentials().is_ok());
-    }
-    Ok(false)
+fn maybe_enable_claude_auth_for_auto(_has_other_provider: bool) -> Result<bool> {
+    Ok(auth::claude::load_credentials().is_ok())
 }
 
 fn ensure_gemini_auth_allowed_for_explicit_choice() -> Result<()> {
-    // An official Gemini Developer API key (GEMINI_API_KEY) authenticates
-    // directly against generativelanguage.googleapis.com and needs no OAuth
-    // consent flow, so allow it without further prompting.
-    if auth::gemini::has_api_key() {
-        return Ok(());
-    }
-    if auth::gemini::load_tokens().is_ok() {
-        return Ok(());
-    }
-
-    if maybe_prompt_for_generic_oauth_source(
-        "Gemini",
-        auth::external::preferred_unconsented_gemini_oauth_source(),
-        "jcode login --provider gemini",
-        false,
-        || auth::gemini::load_tokens().is_ok(),
-    )? {
-        return Ok(());
-    }
-
-    if !auth::gemini::has_unconsented_cli_auth() {
-        return Ok(());
-    }
-    let path = auth::gemini::gemini_cli_oauth_path()?;
-    if !can_prompt_for_external_auth() {
-        anyhow::bail!(external_auth_blocked_message(
-            "Gemini",
-            "Gemini CLI",
-            &path,
-            "jcode login --provider gemini"
-        ));
-    }
-    if prompt_to_trust_external_auth("Gemini", "Gemini CLI", &path)? {
-        auth::gemini::trust_cli_auth_for_future_use()?;
-        return Ok(());
-    }
-    anyhow::bail!(
-        "Skipped trusting Gemini CLI credentials. Run `jcode login --provider gemini` to authenticate jcode directly."
-    )
+    Ok(())
 }
 
-fn maybe_enable_gemini_auth_for_auto(has_other_provider: bool) -> Result<bool> {
-    // A configured Gemini Developer API key is sufficient on its own.
-    if auth::gemini::has_api_key() {
-        return Ok(true);
-    }
-    if auth::gemini::load_tokens().is_ok() {
-        return Ok(true);
-    }
-
-    if let Some(source) = auth::external::preferred_unconsented_gemini_oauth_source() {
-        if has_other_provider {
-            return Ok(false);
-        }
-        return maybe_prompt_for_generic_oauth_source(
-            "Gemini",
-            Some(source),
-            "jcode login --provider gemini",
-            true,
-            || auth::gemini::load_tokens().is_ok(),
-        );
-    }
-
-    if !auth::gemini::has_unconsented_cli_auth() {
-        return Ok(false);
-    }
-    if has_other_provider {
-        return Ok(false);
-    }
-    let path = auth::gemini::gemini_cli_oauth_path()?;
-    if !can_prompt_for_external_auth() {
-        crate::logging::warn(&external_auth_blocked_message(
-            "Gemini",
-            "Gemini CLI",
-            &path,
-            "jcode login --provider gemini",
-        ));
-        return Ok(false);
-    }
-    if prompt_to_trust_external_auth("Gemini", "Gemini CLI", &path)? {
-        auth::gemini::trust_cli_auth_for_future_use()?;
-        return Ok(auth::gemini::load_tokens().is_ok());
-    }
-    Ok(false)
+fn maybe_enable_gemini_auth_for_auto(_has_other_provider: bool) -> Result<bool> {
+    Ok(auth::gemini::has_api_key() || auth::gemini::load_tokens().is_ok())
 }
 
 fn ensure_antigravity_auth_allowed_for_explicit_choice() -> Result<()> {
-    if auth::antigravity::load_tokens().is_ok() {
-        return Ok(());
-    }
-
-    if maybe_prompt_for_generic_oauth_source(
-        "Antigravity",
-        auth::external::preferred_unconsented_antigravity_oauth_source(),
-        "jcode login --provider antigravity",
-        false,
-        || auth::antigravity::load_tokens().is_ok(),
-    )? {
-        return Ok(());
-    }
-
     Ok(())
 }
 
 fn ensure_copilot_auth_allowed_for_explicit_choice() -> Result<()> {
-    if auth::copilot::load_github_token().is_ok() {
-        return Ok(());
-    }
-    let Some(source) = auth::copilot::has_unconsented_external_auth() else {
-        return Ok(());
-    };
-    let path = source.path();
-    if !can_prompt_for_external_auth() {
-        anyhow::bail!(external_auth_blocked_message(
-            "GitHub Copilot",
-            source.display_name(),
-            &path,
-            "jcode login --provider copilot"
-        ));
-    }
-    if prompt_to_trust_external_auth("GitHub Copilot", source.display_name(), &path)? {
-        auth::copilot::trust_external_auth_source(source)?;
-        return Ok(());
-    }
-    anyhow::bail!(
-        "Skipped trusting external Copilot credentials. Run `jcode login --provider copilot` to authenticate jcode directly."
-    )
+    Ok(())
 }
 
-fn maybe_enable_copilot_auth_for_auto(has_other_provider: bool) -> Result<bool> {
-    if auth::copilot::load_github_token().is_ok() {
-        return Ok(true);
-    }
-    let Some(source) = auth::copilot::has_unconsented_external_auth() else {
-        return Ok(false);
-    };
-    if has_other_provider {
-        return Ok(false);
-    }
-    let path = source.path();
-    if !can_prompt_for_external_auth() {
-        crate::logging::warn(&external_auth_blocked_message(
-            "GitHub Copilot",
-            source.display_name(),
-            &path,
-            "jcode login --provider copilot",
-        ));
-        return Ok(false);
-    }
-    if prompt_to_trust_external_auth("GitHub Copilot", source.display_name(), &path)? {
-        auth::copilot::trust_external_auth_source(source)?;
-        return Ok(auth::copilot::load_github_token().is_ok());
-    }
-    Ok(false)
+fn maybe_enable_copilot_auth_for_auto(_has_other_provider: bool) -> Result<bool> {
+    Ok(auth::copilot::load_github_token().is_ok())
 }
 
 fn ensure_cursor_auth_allowed_for_explicit_choice() -> Result<()> {
-    if auth::cursor::has_cursor_native_auth() || auth::cursor::has_cursor_api_key() {
-        return Ok(());
-    }
-    let Some(source) = auth::cursor::has_unconsented_external_auth() else {
-        return Ok(());
-    };
-    let path = source.path()?;
-    if !can_prompt_for_external_auth() {
-        anyhow::bail!(external_auth_blocked_message(
-            "Cursor",
-            source.display_name(),
-            &path,
-            "jcode login --provider cursor"
-        ));
-    }
-    if prompt_to_trust_external_auth("Cursor", source.display_name(), &path)? {
-        auth::cursor::trust_external_auth_source(source)?;
-        return Ok(());
-    }
-    anyhow::bail!(
-        "Skipped trusting external Cursor credentials. Run `jcode login --provider cursor` to authenticate jcode directly."
-    )
+    Ok(())
 }
 
-fn maybe_enable_cursor_auth_for_auto(has_other_provider: bool) -> Result<bool> {
-    if auth::cursor::has_cursor_native_auth() || auth::cursor::has_cursor_api_key() {
-        return Ok(true);
-    }
-    let Some(source) = auth::cursor::has_unconsented_external_auth() else {
-        return Ok(false);
-    };
-    if has_other_provider {
-        return Ok(false);
-    }
-    let path = source.path()?;
-    if !can_prompt_for_external_auth() {
-        crate::logging::warn(&external_auth_blocked_message(
-            "Cursor",
-            source.display_name(),
-            &path,
-            "jcode login --provider cursor",
-        ));
-        return Ok(false);
-    }
-    if prompt_to_trust_external_auth("Cursor", source.display_name(), &path)? {
-        auth::cursor::trust_external_auth_source(source)?;
-        return Ok(auth::cursor::has_cursor_native_auth());
-    }
-    Ok(false)
+fn maybe_enable_cursor_auth_for_auto(_has_other_provider: bool) -> Result<bool> {
+    Ok(auth::cursor::has_cursor_native_auth() || auth::cursor::has_cursor_api_key())
 }
 
 pub fn select_initial_model_provider(provider_key: &str) {

@@ -22,6 +22,16 @@ pub struct DisplayConfig {
     pub auto_server_reload: bool,
     /// Capture mouse events (default: true). Enables scroll wheel but disables terminal selection.
     pub mouse_capture: bool,
+    /// Whether to use fullscreen alternate screen buffer for the chat transcript (default: true).
+    /// When set to false (Scrollback native mode, like Codex CLI):
+    /// - Disables Alternate Screen Buffer (output flows into primary terminal history)
+    /// - Disables Mouse Capture (terminal native scroll wheel and copy/paste work 100%)
+    /// - In SSH, native scrollback is instant, silky smooth, and has 0 network redraw lag.
+    #[serde(default = "default_true")]
+    pub fullscreen_transcript: bool,
+    /// Whether screen reader detection has run (compatible with codex config)
+    #[serde(default)]
+    pub screen_reader_detection_done: bool,
     /// Enable debug socket for external control (default: false)
     pub debug_socket: bool,
     /// Render emoji in terminal-facing TUI and CLI output (default: true)
@@ -135,11 +145,13 @@ impl Default for DisplayConfig {
             queue_mode: false,
             auto_server_reload: true,
             mouse_capture: true,
+            fullscreen_transcript: true,
+            screen_reader_detection_done: false,
             debug_socket: false,
             emoji: true,
             centered: false,
             show_thinking: true,
-            reasoning_display: Some(ReasoningDisplayMode::Full),
+            reasoning_display: Some(ReasoningDisplayMode::Current),
             diagram_mode: DiagramDisplayMode::default(),
             markdown_spacing: MarkdownSpacingMode::default(),
             latex_rendering: LatexRenderingMode::default(),
@@ -182,7 +194,7 @@ impl DisplayConfig {
     /// boolean (true => Full, false => Off) when unset.
     pub fn reasoning_display(&self) -> ReasoningDisplayMode {
         self.reasoning_display.unwrap_or(if self.show_thinking {
-            ReasoningDisplayMode::Full
+            ReasoningDisplayMode::Current
         } else {
             ReasoningDisplayMode::Off
         })
@@ -219,14 +231,14 @@ mod tests {
     use crate::ReasoningDisplayMode;
 
     #[test]
-    fn thinking_is_shown_in_full_by_default() {
+    fn thinking_is_shown_in_current_by_default() {
         let default = DisplayConfig::default();
         assert!(default.show_thinking);
-        assert_eq!(default.reasoning_display(), ReasoningDisplayMode::Full);
+        assert_eq!(default.reasoning_display(), ReasoningDisplayMode::Current);
 
         let missing: DisplayConfig = serde_json::from_str("{}").expect("display config");
         assert!(missing.show_thinking);
-        assert_eq!(missing.reasoning_display(), ReasoningDisplayMode::Full);
+        assert_eq!(missing.reasoning_display(), ReasoningDisplayMode::Current);
     }
 
     #[test]

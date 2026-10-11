@@ -3,6 +3,9 @@ use super::*;
 impl App {
     pub(super) fn command_help(&self, topic: &str) -> Option<String> {
         let topic = topic.trim().trim_start_matches('/').to_lowercase();
+        if let Some(zh) = jcode_i18n::t_detailed_help(&topic) {
+            return Some(zh.to_string());
+        }
         let help = match topic.as_str() {
             "help" | "commands" => {
                 "/help\nShow general command list and keyboard shortcuts.\n\n/help <command>\nShow detailed help for one command."

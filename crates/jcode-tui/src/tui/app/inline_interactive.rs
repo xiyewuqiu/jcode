@@ -3756,6 +3756,21 @@ impl App {
                         }
                         let _ = self.session.save();
                     }
+                    PickerAction::Effort => {
+                        let chosen_effort = route.api_method.clone();
+                        if self.is_remote {
+                            self.pending_reasoning_effort = Some(chosen_effort.clone());
+                        } else {
+                            let _ = self.provider.set_reasoning_effort(&chosen_effort);
+                        }
+                        self.inline_interactive_state = None;
+                        let label = crate::tui::app::helpers::effort_display_label(&chosen_effort);
+                        self.push_display_message(DisplayMessage::system(format!(
+                            "✓ Reasoning effort → {}",
+                            label
+                        )));
+                        self.set_status_notice(format!("Effort → {}", chosen_effort));
+                    }
                     PickerAction::Model => {
                         if !route.available {
                             self.push_display_message(DisplayMessage::error(
@@ -3918,6 +3933,20 @@ impl App {
                         });
                         // First-run onboarding: a model choice advances the flow.
                         self.onboarding_after_model_select();
+
+                        // If the chosen model supports multiple reasoning efforts, open effort picker seamlessly!
+                        let available_efforts = if self.is_remote {
+                            let (provider_name, provider_model) = self.remote_effort_identity();
+                            super::inferred_reasoning_efforts(
+                                provider_name.as_deref(),
+                                provider_model.as_deref(),
+                            )
+                        } else {
+                            self.provider.available_efforts()
+                        };
+                        if available_efforts.len() > 1 {
+                            self.open_effort_picker();
+                        }
                     }
                 }
             }

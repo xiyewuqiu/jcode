@@ -367,4 +367,77 @@ impl App {
             picker.filter.clear();
         }
     }
+
+    pub(crate) fn open_effort_picker(&mut self) {
+        let available_efforts = if self.is_remote {
+            let (provider_name, provider_model) = self.remote_effort_identity();
+            crate::tui::app::inferred_reasoning_efforts(
+                provider_name.as_deref(),
+                provider_model.as_deref(),
+            )
+        } else {
+            self.provider.available_efforts()
+        };
+        if available_efforts.len() <= 1 {
+            return;
+        }
+        let current_effort = if self.is_remote {
+            self.remote_reasoning_effort.clone()
+        } else {
+            self.provider.reasoning_effort()
+        };
+
+        let entries: Vec<PickerEntry> = available_efforts
+            .iter()
+            .enumerate()
+            .map(|(idx, effort)| {
+                let is_current = current_effort.as_deref() == Some(*effort);
+                let label = crate::tui::app::helpers::effort_display_label(effort);
+                let detail = match *effort {
+                    "none" | "off" => "关闭思考推理 (极速响应)",
+                    "low" => "低度思考 (轻量任务)",
+                    "medium" => "中度思考 (平衡模式)",
+                    "high" => "深度思考 (复杂架构与长推理)",
+                    "max" => "最大思考强度 (极限推理能力)",
+                    _ => "调整思考深度",
+                };
+                PickerEntry {
+                    name: format!("{} [{}]", label, effort),
+                    options: vec![PickerOption {
+                        provider: effort.to_string(),
+                        api_method: effort.to_string(),
+                        available: true,
+                        detail: detail.to_string(),
+                        estimated_reference_cost_micros: None,
+                    }],
+                    action: PickerAction::Effort,
+                    selected_option: 0,
+                    is_current,
+                    is_default: is_current,
+                    is_favorite: false,
+                    recommended: *effort == "high" || *effort == "medium",
+                    recommendation_rank: idx,
+                    usage_score: 0,
+                    old: false,
+                    created_date: None,
+                    effort: Some(effort.to_string()),
+                }
+            })
+            .collect();
+
+        let filtered = (0..entries.len()).collect();
+        let selected = entries.iter().position(|e| e.is_current).unwrap_or(0);
+        self.inline_view_state = None;
+        self.inline_interactive_state = Some(InlineInteractiveState {
+            kind: PickerKind::Model,
+            filtered,
+            entries,
+            selected,
+            column: 0,
+            filter: String::new(),
+            preview: false,
+        });
+        self.input.clear();
+        self.cursor_pos = 0;
+    }
 }

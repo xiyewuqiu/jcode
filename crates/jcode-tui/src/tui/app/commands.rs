@@ -892,6 +892,131 @@ pub(super) fn handle_help_command(app: &mut App, trimmed: &str) -> bool {
     false
 }
 
+pub(super) fn handle_lang_command(app: &mut App, trimmed: &str) -> bool {
+    let Some(rest) = slash_command_rest(trimmed, "/lang")
+        .or_else(|| slash_command_rest(trimmed, "/language"))
+    else {
+        return false;
+    };
+
+    let arg = rest.trim();
+    if arg.is_empty() {
+        let current = jcode_i18n::current_language().as_str();
+        let msg = if jcode_i18n::is_chinese() {
+            format!("当前界面语言：中文 ({current})。输入 `/lang en` 可切换为英文，`/lang zh` 切换为中文。")
+        } else {
+            format!("Current UI language: {current}. Use `/lang zh` for Chinese or `/lang en` for English.")
+        };
+        app.push_display_message(DisplayMessage::system(msg));
+        return true;
+    }
+
+    if let Some(target_lang) = jcode_i18n::Language::from_str_loose(arg) {
+        jcode_i18n::set_language(target_lang);
+        app.invalidate_command_candidates_cache();
+        let msg = if target_lang == jcode_i18n::Language::ZhCn {
+            "界面语言已切换为：中文。"
+        } else {
+            "UI language switched to English."
+        };
+        app.push_display_message(DisplayMessage::system(msg));
+    } else {
+        let err = if jcode_i18n::is_chinese() {
+            format!("未知语言选项 '{}'。支持：'zh' (中文) 或 'en' (English)。", arg)
+        } else {
+            format!("Unknown language option '{}'. Supported: 'zh' or 'en'.", arg)
+        };
+        app.push_display_message(DisplayMessage::error(err));
+    }
+    true
+}
+
+pub(super) fn handle_scrollback_command(app: &mut App, trimmed: &str) -> bool {
+    let Some(rest) = slash_command_rest(trimmed, "/scrollback")
+        .or_else(|| slash_command_rest(trimmed, "/tui"))
+    else {
+        return false;
+    };
+
+    let arg = rest.trim();
+    let current_fullscreen = crate::perf::tui_policy().fullscreen_transcript;
+
+    if arg.is_empty() {
+        let msg = if jcode_i18n::is_chinese() {
+            if !current_fullscreen {
+                "【Scrollback 原生回滚模式】（已启用）\n\
+                 • 终端备用屏幕（Alternate Screen Buffer）与鼠标捕获已关闭\n\
+                 • 终端原生滚动条、滚轮及文本选中复制 100% 生效\n\
+                 • 在 SSH 远程开发下零重绘延迟，完全丝滑流畅\n\
+                 如需切换回全屏模式，可输入 `/scrollback off` 或在配置中设置 `[display] fullscreen_transcript = true`。"
+            } else {
+                "【全屏 Alternate Screen 模式】（当前运行）\n\
+                 • 占用了终端备用屏幕缓冲区\n\
+                 如需启用极速丝滑的终端原生回滚体验（Codex CLI 模式）：\n\
+                 1. 可在 `config.toml` 添加：\n\
+                    [display]\n\
+                    fullscreen_transcript = false\n\
+                 2. 或设置环境变量：`export JCODE_SCROLLBACK=1`（或 `JCODE_FULLSCREEN_TRANSCRIPT=0`）\n\
+                 3. 重启会话即可生效！"
+            }
+        } else {
+            if !current_fullscreen {
+                "【Scrollback Native Mode】(Active)\n\
+                 • Alternate Screen Buffer and mouse capture are disabled\n\
+                 • Native terminal scrollback buffer, wheel, and text selection work 100%\n\
+                 • Zero redraw latency over SSH connections\n\
+                 Use `/scrollback off` or set `[display] fullscreen_transcript = true` to switch to fullscreen mode."
+            } else {
+                "【Fullscreen Alternate Screen Mode】(Current)\n\
+                 To enable silky-smooth terminal native scrollback (Codex CLI mode):\n\
+                 1. In `config.toml`, add:\n\
+                    [display]\n\
+                    fullscreen_transcript = false\n\
+                 2. Or set environment: `export JCODE_SCROLLBACK=1` (or `JCODE_FULLSCREEN_TRANSCRIPT=0`)\n\
+                 3. Restart the session to apply!"
+            }
+        };
+        app.push_display_message(DisplayMessage::system(msg));
+        return true;
+    }
+
+    match arg.to_ascii_lowercase().as_str() {
+        "on" | "true" | "1" | "scrollback" => {
+            crate::env::set_var("JCODE_FULLSCREEN_TRANSCRIPT", "0");
+            crate::env::set_var("JCODE_SCROLLBACK", "1");
+            let msg = if jcode_i18n::is_chinese() {
+                "已将下一次会话模式设置为：Scrollback 原生回滚模式。\n\
+                 提示：请执行 `/restart` 或重新启动 jcode 以生效。"
+            } else {
+                "Next session mode set to: Scrollback Native Mode.\n\
+                 Tip: Run `/restart` or relaunch jcode to take effect."
+            };
+            app.push_display_message(DisplayMessage::system(msg));
+        }
+        "off" | "false" | "0" | "fullscreen" => {
+            crate::env::set_var("JCODE_FULLSCREEN_TRANSCRIPT", "1");
+            crate::env::remove_var("JCODE_SCROLLBACK");
+            let msg = if jcode_i18n::is_chinese() {
+                "已将下一次会话模式设置为：全屏 Alternate Screen 模式。\n\
+                 提示：请执行 `/restart` 或重新启动 jcode 以生效。"
+            } else {
+                "Next session mode set to: Fullscreen Alternate Screen Mode.\n\
+                 Tip: Run `/restart` or relaunch jcode to take effect."
+            };
+            app.push_display_message(DisplayMessage::system(msg));
+        }
+        _ => {
+            let err = if jcode_i18n::is_chinese() {
+                format!("未知模式参数 '{}'。支持：`/scrollback on` 或 `/scrollback off`（或 `/tui scrollback` / `/tui fullscreen`）。", arg)
+            } else {
+                format!("Unknown mode argument '{}'. Supported: `/scrollback on` or `/scrollback off`.", arg)
+            };
+            app.push_display_message(DisplayMessage::error(err));
+        }
+    }
+    true
+}
+
 /// `/keys` shows the keymap diagnostics: detected terminal, discovered terminal
 /// and macOS shortcuts, and any conflicts with jcode's own keybindings.
 /// `/keys refresh` forces a fresh scan of the machine (otherwise a cached
@@ -3256,8 +3381,12 @@ fn resume_terminal_after_editor() {
     // signal arriving while these modes are re-armed runs the full cleanup.
     // Re-enter the TUI before returning to the event loop. The existing
     // ratatui Terminal remains usable and the next loop iteration redraws it.
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(ratatui::init));
     let policy = crate::perf::tui_policy();
+    if policy.fullscreen_transcript {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(ratatui::init));
+    } else {
+        let _ = crossterm::terminal::enable_raw_mode();
+    }
     let _ = crossterm::execute!(std::io::stdout(), EnableBracketedPaste);
     if policy.enable_focus_change {
         let _ = crossterm::execute!(std::io::stdout(), EnableFocusChange);

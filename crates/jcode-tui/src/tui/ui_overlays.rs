@@ -241,26 +241,28 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     };
 
     let help_entry = |cmd: &str, desc: &str| -> Line<'static> {
+        let localized_desc = jcode_i18n::t_ui(desc);
         Line::from(vec![
             Span::styled("    ", Style::default()),
             Span::styled(cmd.to_string(), cmd_style),
             Span::styled("  ", Style::default()),
-            Span::styled(desc.to_string(), desc_style),
+            Span::styled(localized_desc.to_string(), desc_style),
         ])
     };
 
     let alt = jcode_tui_core::keybind::alt_chord;
     let key_entry = |key: &str, desc: &str| -> Line<'static> {
+        let localized_desc = jcode_i18n::t_ui(desc);
         Line::from(vec![
             Span::styled("    ", Style::default()),
             Span::styled(format!("{:<22}", key), key_style),
-            Span::styled(desc.to_string(), desc_style),
+            Span::styled(localized_desc.to_string(), desc_style),
         ])
     };
 
     lines.push(Line::from(""));
 
-    lines.push(Line::from(Span::styled("  Commands", section_style)));
+    lines.push(Line::from(Span::styled(jcode_i18n::t_section("  Commands"), section_style)));
     lines.push(Line::from(""));
     lines.push(help_entry("/help", "Show this help overlay"));
     lines.push(help_entry(
@@ -346,7 +348,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(separator());
     lines.push(Line::from(""));
 
-    lines.push(Line::from(Span::styled("  Session", section_style)));
+    lines.push(Line::from(Span::styled(jcode_i18n::t_section("  Session"), section_style)));
     lines.push(Line::from(""));
     lines.push(help_entry("/clear", "Clear conversation and start fresh"));
     lines.push(help_entry(
@@ -436,7 +438,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(separator());
     lines.push(Line::from(""));
 
-    lines.push(Line::from(Span::styled("  Memory & Swarm", section_style)));
+    lines.push(Line::from(Span::styled(jcode_i18n::t_section("  Memory & Swarm"), section_style)));
     lines.push(Line::from(""));
     lines.push(help_entry("/memory [on|off]", "Toggle memory features"));
     lines.push(help_entry(
@@ -453,7 +455,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(separator());
     lines.push(Line::from(""));
 
-    lines.push(Line::from(Span::styled("  Auth & Accounts", section_style)));
+    lines.push(Line::from(Span::styled(jcode_i18n::t_section("  Auth & Accounts"), section_style)));
     lines.push(Line::from(""));
     lines.push(help_entry("/auth", "Show authentication status"));
     lines.push(help_entry(
@@ -477,7 +479,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(separator());
     lines.push(Line::from(""));
 
-    lines.push(Line::from(Span::styled("  System", section_style)));
+    lines.push(Line::from(Span::styled(jcode_i18n::t_section("  System"), section_style)));
     lines.push(Line::from(""));
     lines.push(help_entry("/reload", "Reload to newer binary if available"));
     lines.push(help_entry(
@@ -535,7 +537,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
         lines.push(separator());
         lines.push(Line::from(""));
 
-        lines.push(Line::from(Span::styled("  Skills", section_style)));
+        lines.push(Line::from(Span::styled(jcode_i18n::t_section("  Skills"), section_style)));
         lines.push(Line::from(""));
         for skill in &skills {
             lines.push(help_entry(&format!("/{}", skill), "Activate skill"));
@@ -546,7 +548,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(separator());
     lines.push(Line::from(""));
 
-    lines.push(Line::from(Span::styled("  Navigation", section_style)));
+    lines.push(Line::from(Span::styled(jcode_i18n::t_section("  Navigation"), section_style)));
     lines.push(Line::from(""));
     lines.push(key_entry("PageUp / PageDown", "Scroll history"));
     lines.push(key_entry("Up / Down", "Scroll history (when input empty)"));
@@ -573,7 +575,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(Line::from(""));
 
     lines.push(Line::from(Span::styled(
-        "  Diagrams & Diffs",
+        jcode_i18n::t_section("  Diagrams & Diffs"),
         section_style,
     )));
     lines.push(Line::from(""));
@@ -618,7 +620,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(separator());
     lines.push(Line::from(""));
 
-    lines.push(Line::from(Span::styled("  Input & Editing", section_style)));
+    lines.push(Line::from(Span::styled(jcode_i18n::t_section("  Input & Editing"), section_style)));
     lines.push(Line::from(""));
     lines.push(key_entry(
         "Ctrl+C / Ctrl+D",

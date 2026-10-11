@@ -8,54 +8,30 @@
 //! both the CLI login flow and the TUI auth UI.
 
 use anyhow::Result;
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, Write};
 
 use crate::auth;
 
 pub fn can_prompt_for_external_auth() -> bool {
-    std::io::stdin().is_terminal()
-        && std::io::stderr().is_terminal()
-        && std::env::var("JCODE_NON_INTERACTIVE").is_err()
+    // Disabled: Do not auto-detect external third-party tool credentials or popup trust prompts
+    false
 }
 
 pub fn external_auth_blocked_message(
-    provider_name: &str,
-    source_name: &str,
-    path: &std::path::Path,
-    login_hint: &str,
+    _provider_name: &str,
+    _source_name: &str,
+    _path: &std::path::Path,
+    _login_hint: &str,
 ) -> String {
-    format!(
-        "Found existing {} credentials from {} at {} but jcode will not read them without confirmation. Re-run in an interactive terminal to approve this auth source for future jcode sessions, or run `{}`.",
-        provider_name,
-        source_name,
-        path.display(),
-        login_hint
-    )
+    String::new()
 }
 
 pub fn prompt_to_trust_external_auth(
-    provider_name: &str,
-    source_name: &str,
-    path: &std::path::Path,
+    _provider_name: &str,
+    _source_name: &str,
+    _path: &std::path::Path,
 ) -> Result<bool> {
-    eprintln!();
-    eprintln!(
-        "Found existing {} credentials from {} at {}.",
-        provider_name,
-        source_name,
-        path.display()
-    );
-    eprintln!("jcode will only read that source in place after you approve it.");
-    eprintln!("It will not move, delete, or rewrite the original auth there.");
-    eprint!("Trust this auth source for future jcode sessions? [y/N]: ");
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    Ok(matches!(
-        input.trim().to_ascii_lowercase().as_str(),
-        "y" | "yes"
-    ))
+    Ok(false)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -393,6 +369,7 @@ pub fn parse_external_auth_review_selection(input: &str, count: usize) -> Result
     Ok(selected)
 }
 
+#[allow(dead_code)]
 fn prompt_to_review_external_auth_sources(
     candidates: &[ExternalAuthReviewCandidate],
 ) -> Result<Vec<usize>> {
@@ -672,22 +649,7 @@ async fn validate_external_auth_review_candidate(
 }
 
 pub async fn maybe_run_external_auth_auto_import_flow() -> Result<Option<usize>> {
-    if !can_prompt_for_external_auth() {
-        return Ok(None);
-    }
-
-    let candidates = pending_external_auth_review_candidates()?;
-    if candidates.is_empty() {
-        return Ok(None);
-    }
-
-    let selected = prompt_to_review_external_auth_sources(&candidates)?;
-    let outcome = run_external_auth_auto_import_candidates(&candidates, &selected).await?;
-    for line in &outcome.messages {
-        eprintln!("{}", line);
-    }
-    auth::AuthStatus::invalidate_cache();
-    Ok(Some(outcome.imported))
+    Ok(None)
 }
 
 pub fn format_external_auth_review_candidates_markdown(

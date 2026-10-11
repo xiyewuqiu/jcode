@@ -31,7 +31,7 @@ jobs:
     # Every other job in this workflow needs `create-release`, directly or
     # transitively, so gating this one job skips the whole workflow: a skipped
     # dependency skips its dependents.
-    if: github.repository == '1jehuang/jcode'
+    if: github.repository == '1jehuang/jcode' || github.repository == 'xiyewuqiu/jcode'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
