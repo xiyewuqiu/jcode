@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$HOME" 2>/dev/null || true
 
 REPO="${JCODE_REPO:-xiyewuqiu/jcode}"
 RELEASE_METADATA_BASE="${JCODE_RELEASE_METADATA_BASE:-https://github.com/$REPO/releases}"
@@ -235,8 +236,14 @@ bin_name="jcode${EXE}"
 
 if [ "$download_mode" = "tar" ]; then
   tar xzf "$tmpdir/jcode.download" -C "$tmpdir"
-  src_bin="$tmpdir/${ARTIFACT}${EXE}"
-  [ -f "$src_bin" ] || err "Downloaded archive did not contain expected binary: ${ARTIFACT}${EXE}"
+  src_bin=""
+  for candidate_bin in "$tmpdir/${ARTIFACT}${EXE}" "$tmpdir/jcode${EXE}" "$tmpdir/${ARTIFACT}" "$tmpdir/jcode"; do
+    if [ -f "$candidate_bin" ]; then
+      src_bin="$candidate_bin"
+      break
+    fi
+  done
+  [ -n "$src_bin" ] || err "Downloaded archive did not contain expected binary: ${ARTIFACT}${EXE} or jcode${EXE}"
   find "$tmpdir" -maxdepth 1 -type f \( -name "${ARTIFACT}${EXE}.bin" -o -name 'libssl.so*' -o -name 'libcrypto.so*' \) \
     -exec cp -f {} "$dest_version_dir/" \;
   mv "$src_bin" "$dest_version_dir/$bin_name"

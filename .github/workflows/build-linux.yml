@@ -60,8 +60,9 @@ jobs:
           cp target/release/jcode dist/jcode-linux-x86_64
           chmod +x dist/jcode-linux-x86_64
           
-          # Tarball archive
-          tar -czvf dist/jcode-linux-x86_64.tar.gz -C target/release jcode
+          # Tarball archive containing both binary names
+          cp target/release/jcode target/release/jcode-linux-x86_64
+          tar -czvf dist/jcode-linux-x86_64.tar.gz -C target/release jcode jcode-linux-x86_64
           
           # Compute sha256 checksums
           cd dist
