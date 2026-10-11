@@ -48,11 +48,11 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
     exit 1
 }
 
-$Repo = "1jehuang/jcode"
+$Repo = if ($env:JCODE_REPO) { $env:JCODE_REPO } else { "xiyewuqiu/jcode" }
 $ReleaseMetadataBase = if ($env:JCODE_RELEASE_METADATA_BASE) {
     $env:JCODE_RELEASE_METADATA_BASE.TrimEnd('/')
 } else {
-    "https://jcode.sh/releases"
+    "https://github.com/$Repo/releases"
 }
 
 if (-not $InstallDir) {
