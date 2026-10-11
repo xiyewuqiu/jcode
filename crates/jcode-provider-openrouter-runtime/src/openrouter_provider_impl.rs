@@ -121,9 +121,23 @@ impl Provider for OpenRouterProvider {
             })
             .collect();
 
+        let request_model = if let Some(profile_id) = self.profile_id.as_deref() {
+            let slash_prefix = format!("{}/", profile_id);
+            let colon_prefix = format!("{}:", profile_id);
+            if let Some(stripped) = model.strip_prefix(&slash_prefix) {
+                stripped.to_string()
+            } else if let Some(stripped) = model.strip_prefix(&colon_prefix) {
+                stripped.to_string()
+            } else {
+                model.clone()
+            }
+        } else {
+            model.clone()
+        };
+
         // Build request
         let mut request = serde_json::json!({
-            "model": model,
+            "model": request_model,
             "messages": api_messages,
             "stream": true,
         });

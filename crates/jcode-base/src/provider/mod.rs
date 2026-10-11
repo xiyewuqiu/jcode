@@ -1113,11 +1113,17 @@ impl MultiProvider {
             .then_some(provider)
     }
 
-    /// Parse a `<name>:<model>` spec whose prefix is a user-defined named
-    /// provider profile from config (`[providers.<name>]`). Built-in provider
-    /// prefixes and catalog profile ids take precedence and never reach here.
+    /// Parse a `<name>:<model>` or `<name>/<model>` spec whose prefix is a user-defined named
+    /// provider profile from config (`[providers.<name>]`).
     fn named_provider_profile_model_prefix(model: &str) -> Option<(String, String)> {
-        let (prefix, rest) = model.split_once(':')?;
+        let (prefix, rest) = if let Some(parts) = model.split_once(':') {
+            parts
+        } else if let Some(parts) = model.split_once('/') {
+            parts
+        } else {
+            return None;
+        };
+
         if explicit_model_provider_prefix(model).is_some()
             || Self::openai_compatible_model_prefix(model).is_some()
         {
@@ -1134,25 +1140,54 @@ impl MultiProvider {
             .then(|| (prefix.to_string(), rest.to_string()))
     }
 
-    /// Match a bare (unprefixed) model name against configured named provider profiles (JSON providers)
+    /// Match a model name against configured named provider profiles (JSON providers)
     fn named_provider_profile_owning_model(model: &str) -> Option<String> {
         let model = model.trim();
         if model.is_empty() {
             return None;
         }
         let config = crate::config::config();
+
+        let model_matches_entry = |entry_id: &str, provider_name: &str| -> bool {
+            let entry_id = entry_id.trim();
+            if entry_id == model {
+                return true;
+            }
+            if let Some(stripped) = model.strip_prefix(&format!("{}/", provider_name)) {
+                if stripped == entry_id {
+                    return true;
+                }
+            }
+            if let Some(stripped) = model.strip_prefix(&format!("{}:", provider_name)) {
+                if stripped == entry_id {
+                    return true;
+                }
+            }
+            if let Some(stripped) = entry_id.strip_prefix(&format!("{}/", provider_name)) {
+                if stripped == model {
+                    return true;
+                }
+            }
+            if let Some(stripped) = entry_id.strip_prefix(&format!("{}:", provider_name)) {
+                if stripped == model {
+                    return true;
+                }
+            }
+            false
+        };
+
         if let Some(default_p) = config.provider.default_provider.as_deref() {
             if let Some(p_cfg) = config.providers.get(default_p) {
-                if p_cfg.models.iter().any(|m| m.id.trim() == model)
-                    || p_cfg.default_model.as_deref().map(str::trim) == Some(model)
+                if p_cfg.models.iter().any(|m| model_matches_entry(&m.id, default_p))
+                    || p_cfg.default_model.as_deref().is_some_and(|dm| model_matches_entry(dm, default_p))
                 {
                     return Some(default_p.to_string());
                 }
             }
         }
         for (name, p_cfg) in &config.providers {
-            if p_cfg.models.iter().any(|m| m.id.trim() == model)
-                || p_cfg.default_model.as_deref().map(str::trim) == Some(model)
+            if p_cfg.models.iter().any(|m| model_matches_entry(&m.id, name))
+                || p_cfg.default_model.as_deref().is_some_and(|dm| model_matches_entry(dm, name))
             {
                 return Some(name.clone());
             }

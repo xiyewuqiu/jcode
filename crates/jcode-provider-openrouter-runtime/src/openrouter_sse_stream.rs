@@ -204,7 +204,12 @@ async fn stream_response(
     let connect_start = std::time::Instant::now();
     let stream_idle_timeout = jcode_base::provider::stream_idle_timeout();
 
-    let url = format!("{}/chat/completions", api_base);
+    let api_base_clean = api_base.trim().trim_end_matches('/');
+    let url = if api_base_clean.ends_with("/chat/completions") {
+        api_base_clean.to_string()
+    } else {
+        format!("{}/chat/completions", api_base_clean)
+    };
     let mut req = apply_kimi_coding_agent_headers(
         auth.apply(
             client

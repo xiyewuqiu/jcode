@@ -75,7 +75,34 @@ impl<'a> ProviderRegistry<'a> {
 
     /// Runtime that should execute requests for the public OpenRouter slot.
     pub(super) fn active_openrouter_execution(&self) -> Option<Arc<dyn Provider>> {
-        self.active_compatible_profile()
-            .or_else(|| self.real_openrouter())
+        if let Some(active) = self.active_compatible_profile() {
+            return Some(active);
+        }
+        if let Some(real) = self.real_openrouter() {
+            return Some(real);
+        }
+        // Fallback: Check if there is any named provider configured in config.toml or ~/.jcode/providers/*.json
+        let config = crate::config::config();
+        let candidate_profile = config
+            .provider
+            .default_provider
+            .as_deref()
+            .filter(|p| config.providers.contains_key(*p))
+            .or_else(|| config.providers.keys().next().map(|s| s.as_str()));
+        if let Some(profile_name) = candidate_profile {
+            if let Some(profile_cfg) = config.providers.get(profile_name).cloned() {
+                if let Ok(runtime) = external::instantiate_openrouter_runtime(
+                    external::OpenRouterRuntimeSpec::NamedProfile {
+                        name: profile_name.to_string(),
+                        config: profile_cfg,
+                    },
+                ) {
+                    self.install_compatible_profile(profile_name.to_string(), Arc::clone(&runtime));
+                    self.set_active_compatible_profile(profile_name.to_string());
+                    return Some(runtime);
+                }
+            }
+        }
+        None
     }
 }

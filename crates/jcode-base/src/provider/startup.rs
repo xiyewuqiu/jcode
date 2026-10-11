@@ -239,6 +239,29 @@ impl MultiProvider {
             std::env::var("JCODE_COPILOT_PREMIUM").ok().as_deref(),
             Some("0")
         );
+        let mut initial_compatible_profiles = HashMap::new();
+        let initial_active_compatible_profile = std::env::var("JCODE_NAMED_PROVIDER_PROFILE")
+            .ok()
+            .or_else(|| default_named_provider_profile.clone())
+            .or_else(|| cfg.provider.default_provider.clone())
+            .or_else(|| cfg.providers.keys().next().cloned())
+            .filter(|p| cfg.providers.contains_key(p));
+
+        if let Some(ref prof_name) = initial_active_compatible_profile {
+            if let Some(prof_cfg) = cfg.providers.get(prof_name) {
+                if let Ok(runtime) = external::instantiate_openrouter_runtime(
+                    external::OpenRouterRuntimeSpec::NamedProfile {
+                        name: prof_name.clone(),
+                        config: prof_cfg.clone(),
+                    },
+                ) {
+                    initial_compatible_profiles.insert(prof_name.clone(), runtime);
+                }
+            }
+        }
+
+        let has_active_compatible = !initial_compatible_profiles.is_empty();
+
         let availability = ProviderAvailability {
             openai: openai.is_some(),
             claude: anthropic.is_some(),
@@ -247,7 +270,7 @@ impl MultiProvider {
             gemini: gemini_provider.is_some(),
             cursor: cursor_provider.is_some(),
             bedrock: bedrock_provider.is_some(),
-            openrouter: openrouter.is_some(),
+            openrouter: openrouter.is_some() || has_active_compatible,
             copilot_premium_zero,
         };
         let mut active = Self::auto_default_provider(availability);
@@ -295,6 +318,8 @@ impl MultiProvider {
                     pref
                 ));
             }
+        } else if has_active_compatible {
+            active = ActiveProvider::OpenRouter;
         }
 
         let result = Self {
@@ -306,8 +331,8 @@ impl MultiProvider {
             cursor: RwLock::new(cursor_provider),
             bedrock: RwLock::new(bedrock_provider),
             openrouter: RwLock::new(openrouter),
-            openai_compatible_profiles: RwLock::new(HashMap::new()),
-            active_openai_compatible_profile: RwLock::new(None),
+            openai_compatible_profiles: RwLock::new(initial_compatible_profiles),
+            active_openai_compatible_profile: RwLock::new(initial_active_compatible_profile),
             active: RwLock::new(active),
             startup_notices: RwLock::new(Vec::new()),
             initial_provider,

@@ -67,7 +67,17 @@ pub fn has_credentials() -> bool {
     if configured_allow_no_auth() {
         return true;
     }
-    get_api_key().is_some()
+    if get_api_key().is_some() {
+        return true;
+    }
+    // Check if any named provider has credentials configured
+    let config = crate::config::config();
+    for (_, p_cfg) in &config.providers {
+        if p_cfg.api_key.is_some() || matches!(p_cfg.auth, crate::config::NamedProviderAuth::None) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Whether the shared transport is configured as native OpenRouter BYOK.

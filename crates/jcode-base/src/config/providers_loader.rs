@@ -11,11 +11,11 @@ pub struct JsonProviderFile {
     pub id: Option<String>,
     #[serde(default)]
     pub name: Option<String>,
-    #[serde(default, alias = "base_url", alias = "endpoint", alias = "url")]
+    #[serde(default, alias = "base_url", alias = "endpoint", alias = "url", alias = "baseUrl", alias = "baseURL", alias = "apiBase", alias = "api_url", alias = "apiUrl")]
     pub api_base: String,
-    #[serde(default, alias = "key", alias = "token")]
+    #[serde(default, alias = "key", alias = "token", alias = "apiKey", alias = "apikey", alias = "api_key", alias = "api-key", alias = "API_KEY", alias = "APIKEY")]
     pub api_key: Option<String>,
-    #[serde(default, alias = "model")]
+    #[serde(default, alias = "model", alias = "defaultModel")]
     pub default_model: Option<String>,
     #[serde(default)]
     pub models: Vec<JsonModelEntry>,
@@ -178,12 +178,12 @@ pub fn load_providers_from_directory() -> Vec<(String, NamedProviderConfig)> {
         }
 
         let provider_id = provider_def.id.unwrap_or_else(|| file_stem.to_string());
-        let mut api_key = provider_def.api_key;
+        let mut api_key = provider_def.api_key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty());
 
         // Support env var resolution, e.g. "env:MY_API_KEY"
         if let Some(key_val) = &api_key {
             if let Some(env_name) = key_val.strip_prefix("env:") {
-                api_key = std::env::var(env_name.trim()).ok();
+                api_key = std::env::var(env_name.trim()).ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty());
             }
         }
 
@@ -231,3 +231,40 @@ pub fn load_providers_from_directory() -> Vec<(String, NamedProviderConfig)> {
 
     results
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_provider_with_various_apikey_aliases() {
+        let json_camel = r#"{
+            "id": "cline-pass",
+            "baseURL": "https://api.cline.bot/api/v1",
+            "apiKey": "sk-test-camel",
+            "defaultModel": "deepseek-v4.1-flash"
+        }"#;
+        let parsed: JsonProviderFile = serde_json::from_str(json_camel).unwrap();
+        assert_eq!(parsed.api_base, "https://api.cline.bot/api/v1");
+        assert_eq!(parsed.api_key.as_deref(), Some("sk-test-camel"));
+        assert_eq!(parsed.default_model.as_deref(), Some("deepseek-v4.1-flash"));
+
+        let json_lower = r#"{
+            "id": "cline-pass",
+            "url": "https://api.cline.bot/api/v1",
+            "apikey": "sk-test-lower"
+        }"#;
+        let parsed2: JsonProviderFile = serde_json::from_str(json_lower).unwrap();
+        assert_eq!(parsed2.api_base, "https://api.cline.bot/api/v1");
+        assert_eq!(parsed2.api_key.as_deref(), Some("sk-test-lower"));
+
+        let json_upper = r#"{
+            "id": "cline-pass",
+            "api_base": "https://api.cline.bot/api/v1",
+            "API_KEY": "sk-test-upper"
+        }"#;
+        let parsed3: JsonProviderFile = serde_json::from_str(json_upper).unwrap();
+        assert_eq!(parsed3.api_key.as_deref(), Some("sk-test-upper"));
+    }
+}
+
