@@ -468,6 +468,18 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         modes
     };
 
+    // Codex-compatible alternate scroll setup:
+    // Emit \x1b[?1007h (EnableAlternateScroll) and \x1b[?1006h (SGR mouse reports).
+    // In Alternate Screen, this ensures wheel events scroll properly even over SSH or
+    // when mouse reporting is disabled/unsupported by terminal bridges.
+    // In primary scrollback mode, this ensures host terminals cleanly translate wheel events.
+    {
+        use std::io::Write as _;
+        let mut stdout = std::io::stdout().lock();
+        let _ = stdout.write_all(b"\x1b[?1007h\x1b[?1006h");
+        let _ = stdout.flush();
+    }
+
     crate::logging::info(&format!(
         "EVENT event=TUI_TERMINAL_MODES phase=initialized pid={} resuming={} handoff={} handoff_raw={} raw_mode={} mouse_capture={} keyboard_enhanced={} focus_change={} alt_screen={} idempotent_modes_reasserted={}",
         std::process::id(),
@@ -513,6 +525,12 @@ fn cleanup_tui_runtime(state: &TuiRuntimeState, restore_terminal: bool) {
     }
 
     if restore_terminal {
+        {
+            use std::io::Write as _;
+            let mut stdout = std::io::stdout().lock();
+            let _ = stdout.write_all(b"\x1b[?1007l");
+            let _ = stdout.flush();
+        }
         let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableBracketedPaste);
         if state.focus_change {
             let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableFocusChange);

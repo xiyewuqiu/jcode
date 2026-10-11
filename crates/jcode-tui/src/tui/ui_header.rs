@@ -878,7 +878,7 @@ fn build_header_lines_with_auth(
     // Auth inventory: `/login` heading, then one provider per line (dim
     // hollow dot for unconfigured providers).
     let (login_heading, auth_lines) = if let Some(host) = crate::tui::ssh_remote_host() {
-        (format!("/login 认证远程主机 {host}"), Vec::new())
+        (format!("/login to authenticate on {host}"), Vec::new())
     } else {
         let json_providers = crate::config::providers_loader::load_providers_from_directory();
         if !json_providers.is_empty() {

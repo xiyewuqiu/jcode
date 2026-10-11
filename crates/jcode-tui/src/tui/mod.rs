@@ -50,6 +50,7 @@ pub mod mermaid;
 pub mod permissions {
     pub use jcode_tui_permissions::*;
 }
+pub mod model_nux;
 mod redraw_schedule;
 #[allow(unused_imports)]
 pub(crate) use redraw_schedule::{

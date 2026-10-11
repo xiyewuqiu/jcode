@@ -257,6 +257,17 @@ pub fn tui_policy_for(
         }
     }
 
+    // Screen reader accessibility integration (Codex-compatible):
+    // When screen_reader_detection_done is true, bypass probe and preserve full animation rates.
+    // When false, run detection probe. If active, clamp animations down to avoid screen reader chatter.
+    if !display.screen_reader_detection_done {
+        if crate::screen_reader::detect_screen_reader() {
+            enable_decorative_animations = false;
+            animation_fps = 1;
+            redraw_fps = redraw_fps.min(12);
+        }
+    }
+
     let env_fullscreen = std::env::var("JCODE_FULLSCREEN_TRANSCRIPT")
         .ok()
         .and_then(|v| match v.trim().to_ascii_lowercase().as_str() {
@@ -273,8 +284,15 @@ pub fn tui_policy_for(
         });
     let fullscreen_transcript = env_fullscreen.unwrap_or(display.fullscreen_transcript);
 
-    // Support mouse capture (wheel scrolling & clicks) natively across local, WSL, and SSH
-    let enable_mouse_capture = display.mouse_capture;
+    // Support mouse capture (wheel scrolling & clicks) natively across local, WSL, and SSH.
+    // When fullscreen_transcript is false (TranscriptMode::Terminal / Scrollback native mode),
+    // disable application mouse capture so the host terminal handles wheel scrolling natively
+    // directly against its scrollback buffer at hardware 60/120fps with zero network lag!
+    let enable_mouse_capture = if !fullscreen_transcript {
+        false
+    } else {
+        display.mouse_capture
+    };
 
     if !enable_decorative_animations {
         animation_fps = 1;
