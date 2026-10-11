@@ -104,9 +104,9 @@ impl TelemetryLevel {
     /// Short status-line label for the chosen level.
     pub(crate) fn status_label(self) -> &'static str {
         match self {
-            TelemetryLevel::Everything => "Telemetry: sending everything, thank you",
-            TelemetryLevel::NoContent => "Telemetry: usage and crashes only",
-            TelemetryLevel::Nothing => "Telemetry: off",
+            TelemetryLevel::Everything => "遥测：已彻底物理删除（零数据收集）",
+            TelemetryLevel::NoContent => "遥测：已彻底物理删除（零数据收集）",
+            TelemetryLevel::Nothing => "遥测：已彻底物理删除（零数据收集）",
         }
     }
 }

@@ -340,35 +340,14 @@ pub fn begin_concurrency_session(
     session_id: &str,
     parent_session_id: Option<&str>,
 ) -> ConcurrencySession {
-    let mut guard = ConcurrencySession {
+    ConcurrencySession {
         session_id: session_id.to_owned(),
-        incarnation: uuid::Uuid::new_v4().to_string(),
+        incarnation: String::new(),
         child: parent_session_id.is_some(),
         lease: None,
         at_start: Counts::default(),
-        active: is_enabled(),
-    };
-    if !guard.active {
-        return guard;
+        active: false,
     }
-    let result = storage::jcode_dir().and_then(|dir| {
-        Lease::begin(
-            dir.join("telemetry_concurrency_v2"),
-            &guard.incarnation,
-            guard.child,
-        )
-        .map_err(Into::into)
-    });
-    if let Ok((lease, counts)) = result {
-        guard.lease = Some(lease);
-        guard.at_start = counts.unwrap_or_default();
-    }
-    guard.emit(
-        "start",
-        (guard.at_start.total > 0).then_some(guard.at_start),
-        DeliveryMode::Background,
-    );
-    guard
 }
 
 impl ConcurrencySession {

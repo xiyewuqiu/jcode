@@ -4068,39 +4068,10 @@ pub(super) fn handle_telemetry_command(app: &mut App, trimmed: &str) -> bool {
         return false;
     }
 
-    use crate::tui::app::onboarding_flow::TelemetryLevel;
-    let arg = rest.trim().to_ascii_lowercase();
-    let level = match arg.as_str() {
-        "" => {
-            let current = TelemetryLevel::current();
-            let detail = match current {
-                TelemetryLevel::Everything => {
-                    "Sending everything, including prompts and transcripts. Thank you."
-                }
-                TelemetryLevel::NoContent => {
-                    "Sending usage stats and crash reports only. No prompts or transcripts."
-                }
-                TelemetryLevel::Nothing => "Sending nothing.",
-            };
-            app.push_display_message(DisplayMessage::system(format!(
-                "{detail}\nChange it with /telemetry everything | no-prompts | nothing."
-            )));
-            app.set_status_notice(current.status_label());
-            return true;
-        }
-        "everything" | "all" => TelemetryLevel::Everything,
-        "no-prompts" | "no-content" | "usage" => TelemetryLevel::NoContent,
-        "nothing" | "off" | "none" => TelemetryLevel::Nothing,
-        other => {
-            app.push_display_message(DisplayMessage::error(format!(
-                "Unknown telemetry level \"{other}\". Use everything, no-prompts, or nothing."
-            )));
-            return true;
-        }
-    };
-    level.persist();
-    app.push_display_message(DisplayMessage::system(level.status_label().to_string()));
-    app.set_status_notice(level.status_label());
+    app.push_display_message(DisplayMessage::system(
+        "遥测系统已彻底物理删除与停用。本程序零数据上报、零信息收集，完全尊重你的隐私与数据安全 🛡️".to_string(),
+    ));
+    app.set_status_notice("遥测：已彻底物理删除");
     true
 }
 

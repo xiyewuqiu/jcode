@@ -84,70 +84,14 @@ fn base_payload(id: String, event: &str, version: &str) -> Value {
 /// Report that Desktop `desktop_version` is running. Sends `desktop_active` at
 /// most once per UTC day per version, plus `desktop_upgrade` when the version
 /// changed since the last observation. Never blocks.
-pub fn record_desktop_active(desktop_version: &str) {
-    record_desktop_active_on(
-        desktop_version,
-        &chrono::Utc::now().format("%Y-%m-%d").to_string(),
-    );
-}
+pub fn record_desktop_active(_desktop_version: &str) {}
 
-pub(super) fn record_desktop_active_on(desktop_version: &str, utc_date: &str) {
-    if !is_enabled() {
-        return;
-    }
-    let version = sanitize_version(desktop_version);
-    if version.is_empty() {
-        return;
-    }
-    let Some(id) = get_or_create_id() else {
-        return;
-    };
+pub(super) fn record_desktop_active_on(_desktop_version: &str, _utc_date: &str) {}
 
-    let previous = read_state(VERSION_RECORDED_FILE);
-    if let Some(previous) = previous.as_deref()
-        && previous != version
-    {
-        let mut payload = base_payload(id.clone(), "desktop_upgrade", &version);
-        payload["from_version"] = json!(previous);
-        let _ = send_payload(payload, DeliveryMode::Background);
-    }
-    if previous.as_deref() != Some(version.as_str()) {
-        write_state(VERSION_RECORDED_FILE, &version);
-    }
-
-    let marker = format!("{utc_date}|{version}");
-    if read_state(ACTIVE_RECORDED_FILE).as_deref() == Some(marker.as_str()) {
-        return;
-    }
-    let payload = base_payload(id, "desktop_active", &version);
-    if send_payload(payload, DeliveryMode::Background) {
-        write_state(ACTIVE_RECORDED_FILE, &marker);
-    }
-}
-
-/// Report the outcome of a Desktop update attempt. `outcome` is `success`,
-/// `failure`, or `up_to_date`. `install_kind` and `failure_stage` are reduced
-/// to short `[a-z0-9_]` tokens. Never blocks.
 pub fn record_desktop_update(
-    from_version: &str,
-    to_version: &str,
-    install_kind: &str,
-    outcome: &str,
-    failure_stage: Option<&str>,
-) {
-    if !is_enabled() {
-        return;
-    }
-    let Some(id) = get_or_create_id() else {
-        return;
-    };
-    let mut payload = base_payload(id, "desktop_update", &sanitize_version(to_version));
-    payload["from_version"] = json!(sanitize_version(from_version));
-    payload["install_kind"] = json!(sanitize_token(install_kind));
-    payload["update_outcome"] = json!(sanitize_token(outcome));
-    payload["update_failure_stage"] = match failure_stage {
-        Some(stage) => json!(sanitize_token(stage)),
-        None => Value::Null,
-    };
-    let _ = send_payload(payload, DeliveryMode::Background);
-}
+    _from_version: &str,
+    _to_version: &str,
+    _install_kind: &str,
+    _outcome: &str,
+    _failure_stage: Option<&str>,
+) {}

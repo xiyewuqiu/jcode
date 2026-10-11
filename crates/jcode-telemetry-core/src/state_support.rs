@@ -77,16 +77,8 @@ pub(super) fn session_starts_path(id: &str) -> Option<PathBuf> {
     telemetry_state_path(&format!("telemetry_session_starts_{}.txt", id))
 }
 
-pub(super) fn write_private_file(path: &PathBuf, value: &str) {
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let _ = std::fs::write(path, value);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
-    }
+pub(super) fn write_private_file(_path: &PathBuf, _value: &str) {
+    // 彻底切断任何遥测文件写入
 }
 
 pub(super) fn utc_hour(timestamp: DateTime<Utc>) -> u32 {
@@ -97,95 +89,27 @@ pub(super) fn utc_weekday(timestamp: DateTime<Utc>) -> u32 {
     timestamp.weekday().num_days_from_monday()
 }
 
-pub(super) fn write_private_dir_file(path: &PathBuf, value: &str) {
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    write_private_file(path, value);
+pub(super) fn write_private_dir_file(_path: &PathBuf, _value: &str) {
+    // 彻底切断任何遥测文件写入
 }
 
-pub(super) fn read_epoch_lines(path: &PathBuf) -> Vec<i64> {
-    std::fs::read_to_string(path)
-        .ok()
-        .into_iter()
-        .flat_map(|text| {
-            text.lines()
-                .map(str::trim)
-                .map(str::to_string)
-                .collect::<Vec<_>>()
-        })
-        .filter_map(|line| line.parse::<i64>().ok())
-        .collect()
+pub(super) fn read_epoch_lines(_path: &PathBuf) -> Vec<i64> {
+    Vec::new()
 }
 
 pub(super) fn update_session_start_history(
-    id: &str,
-    started_at_utc: DateTime<Utc>,
+    _id: &str,
+    _started_at_utc: DateTime<Utc>,
 ) -> (Option<u64>, u32, u32) {
-    let Some(path) = session_starts_path(id) else {
-        return (None, 0, 0);
-    };
-    let now = started_at_utc.timestamp();
-    let cutoff_30d = now - 30 * 24 * 60 * 60;
-    let mut starts = read_epoch_lines(&path)
-        .into_iter()
-        .filter(|value| *value >= cutoff_30d)
-        .collect::<Vec<_>>();
-    starts.sort_unstable();
-    let previous = starts.last().copied();
-    starts.push(now);
-    let rendered = starts
-        .iter()
-        .map(i64::to_string)
-        .collect::<Vec<_>>()
-        .join("\n");
-    write_private_dir_file(&path, &rendered);
-    let sessions_started_24h = starts
-        .iter()
-        .filter(|value| now.saturating_sub(**value) < 24 * 60 * 60)
-        .count()
-        .min(u32::MAX as usize) as u32;
-    let sessions_started_7d = starts
-        .iter()
-        .filter(|value| now.saturating_sub(**value) < 7 * 24 * 60 * 60)
-        .count()
-        .min(u32::MAX as usize) as u32;
-    let previous_session_gap_secs = previous
-        .and_then(|value| now.checked_sub(value))
-        .map(|value| value.min(u64::MAX as i64) as u64);
-    (
-        previous_session_gap_secs,
-        sessions_started_24h,
-        sessions_started_7d,
-    )
+    (None, 0, 0)
 }
 
 pub(super) fn get_or_create_id() -> Option<String> {
-    let path = telemetry_id_path()?;
-    if let Some(id) = read_existing_id() {
-        return Some(id);
-    }
-    // Simultaneous first launches must use one installation ID. Serialize the
-    // absent-ID path and publish atomically so fast-path readers never see a
-    // partially written ID. Failure must not emit an unpersisted random ID.
-    std::fs::create_dir_all(path.parent()?).ok()?;
-    let _lock = super::concurrency::lock_path(&path.with_extension("lock")).ok()?;
-    if let Some(id) = read_existing_id() {
-        return Some(id);
-    }
-    let id = uuid::Uuid::new_v4().to_string();
-    super::concurrency::atomic_private_write(&path, id.as_bytes()).ok()?;
-    Some(id)
+    Some("telemetry_disabled".to_string())
 }
 
 pub(super) fn read_existing_id() -> Option<String> {
-    let path = telemetry_id_path()?;
-    let id = match std::fs::read_to_string(path) {
-        Ok(id) => id,
-        Err(_) => return None,
-    };
-    let id = id.trim().to_string();
-    (!id.is_empty()).then_some(id)
+    None
 }
 
 pub(super) fn read_install_conversion_id() -> Option<String> {

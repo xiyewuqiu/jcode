@@ -32,8 +32,8 @@ use std::sync::mpsc::TrySendError;
 use std::sync::mpsc::{SyncSender, sync_channel};
 use std::time::{Duration, Instant};
 
-const TELEMETRY_ENDPOINT: &str = "https://telemetry.jcode.sh/v1/event";
-const TRANSCRIPT_ENDPOINT: &str = "https://telemetry.jcode.sh/v1/transcript";
+const TELEMETRY_ENDPOINT: &str = "";
+const TRANSCRIPT_ENDPOINT: &str = "";
 #[cfg(not(test))]
 const ASYNC_SEND_TIMEOUT: Duration = Duration::from_secs(5);
 #[cfg(not(test))]
@@ -536,132 +536,25 @@ pub fn set_usage_telemetry_enabled(enabled: bool) -> bool {
     }
 }
 
-fn emit_telemetry_opt_out() {
-    let Some(id) = get_or_create_id() else {
-        return;
-    };
-    let (schema_version, build_channel, git_checkout, ci, from_cargo) = telemetry_envelope();
-    let payload = serde_json::json!({
-        "event_id": new_event_id(),
-        "id": id,
-        "event": "telemetry_opt_out",
-        "version": version(),
-        "os": std::env::consts::OS,
-        "arch": std::env::consts::ARCH,
-        "step": "telemetry_settings",
-        "schema_version": schema_version,
-        "build_channel": build_channel,
-        "is_git_checkout": git_checkout,
-        "is_ci": ci,
-        "ran_from_cargo": from_cargo,
-    });
-    let _ = send_payload(
-        payload,
-        DeliveryMode::Blocking(BLOCKING_FIRST_PROMPT_TIMEOUT),
-    );
-}
-
-/// Marker file recording that the user opted in to sharing prompt and
-/// transcript content with telemetry. This is a separate, more sensitive
-/// consent than the anonymous usage metrics gated by [`is_enabled`], so it is
-/// off by default and only enabled when the user explicitly opts in (e.g. via
-/// the first-run onboarding flow).
-fn share_content_marker_path() -> Option<std::path::PathBuf> {
-    storage::jcode_dir()
-        .ok()
-        // Version the marker so introducing actual uploads cannot silently turn
-        // an older, pre-upload UI choice into consent for the new program.
-        .map(|d| d.join("telemetry_share_transcripts_v1"))
-}
+fn emit_telemetry_opt_out() {}
 
 /// Whether the user has opted in to sharing prompt/transcript content.
 /// Always false when base telemetry is disabled.
 pub fn content_sharing_enabled() -> bool {
-    if !is_enabled() {
-        return false;
-    }
-    if std::env::var("JCODE_NO_TELEMETRY").is_ok() || std::env::var("DO_NOT_TRACK").is_ok() {
-        return false;
-    }
-    share_content_marker_path()
-        .map(|p| p.exists())
-        .unwrap_or(false)
+    false
 }
 
-/// Persist the user's prompt/transcript content-sharing choice. Writing the
-/// marker opts in; removing it opts out. Returns whether the write succeeded.
-pub fn set_content_sharing_enabled(enabled: bool) -> bool {
-    let Some(path) = share_content_marker_path() else {
-        return false;
-    };
-    if enabled {
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        match std::fs::write(&path, b"1") {
-            Ok(()) => {
-                logging::debug("telemetry content sharing opted in");
-                true
-            }
-            Err(err) => {
-                logging::debug(&format!("failed to write content-sharing marker: {err}"));
-                false
-            }
-        }
-    } else {
-        match std::fs::remove_file(&path) {
-            Ok(()) => true,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
-            Err(err) => {
-                logging::debug(&format!("failed to remove content-sharing marker: {err}"));
-                false
-            }
-        }
-    }
+pub fn set_content_sharing_enabled(_enabled: bool) -> bool {
+    false
 }
 
-/// Queue one complete conversation transcript for the separately consented
-/// content-sharing program. This path is intentionally distinct from anonymous
-/// usage telemetry: it has its own endpoint, queue, backend storage, and an
-/// explicit opt-in gate that is off by default.
 pub fn record_transcript(
-    provider: &str,
-    model: &str,
-    end_reason: SessionEndReason,
-    messages: Value,
+    _provider: &str,
+    _model: &str,
+    _end_reason: SessionEndReason,
+    _messages: Value,
 ) -> bool {
-    if !content_sharing_enabled() {
-        return false;
-    }
-    let Some(id) = get_or_create_id() else {
-        return false;
-    };
-    let message_count = messages.as_array().map_or(0, Vec::len);
-    if message_count == 0 {
-        return false;
-    }
-    let (schema_version, build_channel, is_git_checkout, is_ci, ran_from_cargo) =
-        telemetry_envelope();
-    let payload = serde_json::json!({
-        "id": id,
-        "event": "transcript",
-        "upload_id": uuid::Uuid::new_v4().to_string(),
-        "consent_version": 1,
-        "schema_version": schema_version,
-        "version": env!("CARGO_PKG_VERSION"),
-        "os": std::env::consts::OS,
-        "arch": std::env::consts::ARCH,
-        "build_channel": build_channel,
-        "is_git_checkout": is_git_checkout,
-        "is_ci": is_ci,
-        "ran_from_cargo": ran_from_cargo,
-        "provider": sanitize_telemetry_label(provider),
-        "model": sanitize_telemetry_label(model),
-        "end_reason": end_reason.as_str(),
-        "message_count": message_count,
-        "messages": messages,
-    });
-    send_transcript_payload(payload)
+    false
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1293,92 +1186,18 @@ pub fn record_command_family(command: &str) {
 }
 
 #[cfg(not(test))]
-fn post_payload(payload: serde_json::Value, timeout: Duration) -> bool {
-    if TELEMETRY_PERMANENTLY_REJECTED.load(Ordering::Relaxed) {
-        return false;
-    }
-    // Newer event types can reach an older worker that rejects them as unknown.
-    // That must only drop the one payload, never disable all telemetry.
-    let breaker_exempt = payload_is_breaker_exempt(&payload);
-    let client = TELEMETRY_HTTP_CLIENT.get_or_init(|| {
-        reqwest::blocking::Client::builder()
-            .user_agent(jcode_provider_core::JCODE_USER_AGENT)
-            .build()
-            .expect("telemetry HTTP client should build")
-    });
-    match client
-        .post(TELEMETRY_ENDPOINT)
-        .timeout(timeout)
-        .json(&payload)
-        .send()
-    {
-        Ok(response) if response.status().is_success() => true,
-        Ok(response) => {
-            let status = response.status();
-            if telemetry_status_is_permanent(status.as_u16()) && !breaker_exempt {
-                TELEMETRY_PERMANENTLY_REJECTED.store(true, Ordering::Relaxed);
-                logging::warn(&format!(
-                    "telemetry endpoint permanently rejected payload with HTTP {status}; suppressing telemetry delivery for this process"
-                ));
-            } else {
-                logging::warn(&format!(
-                    "telemetry endpoint temporarily rejected payload with HTTP {status}"
-                ));
-            }
-            false
-        }
-        Err(err) => {
-            logging::warn(&format!("telemetry payload send failed: {err}"));
-            false
-        }
-    }
-}
-
-#[cfg(not(test))]
-fn post_payload_with_retry(payload: serde_json::Value, timeout: Duration) -> bool {
-    const RETRY_DELAYS: [Duration; 2] = [Duration::from_millis(200), Duration::from_millis(800)];
-    if post_payload(payload.clone(), timeout) {
-        return true;
-    }
-    for delay in RETRY_DELAYS {
-        if TELEMETRY_PERMANENTLY_REJECTED.load(Ordering::Relaxed) {
-            return false;
-        }
-        std::thread::sleep(delay);
-        if post_payload(payload.clone(), timeout) {
-            return true;
-        }
-    }
+fn post_payload(_payload: serde_json::Value, _timeout: Duration) -> bool {
     false
 }
 
 #[cfg(not(test))]
-fn post_transcript_payload(payload: serde_json::Value, timeout: Duration) -> bool {
-    let client = TELEMETRY_HTTP_CLIENT.get_or_init(|| {
-        reqwest::blocking::Client::builder()
-            .user_agent(jcode_provider_core::JCODE_USER_AGENT)
-            .build()
-            .expect("telemetry HTTP client should build")
-    });
-    match client
-        .post(TRANSCRIPT_ENDPOINT)
-        .timeout(timeout)
-        .json(&payload)
-        .send()
-    {
-        Ok(response) if response.status().is_success() => true,
-        Ok(response) => {
-            logging::warn(&format!(
-                "transcript endpoint rejected upload with HTTP {}",
-                response.status()
-            ));
-            false
-        }
-        Err(err) => {
-            logging::warn(&format!("transcript upload failed: {err}"));
-            false
-        }
-    }
+fn post_payload_with_retry(_payload: serde_json::Value, _timeout: Duration) -> bool {
+    false
+}
+
+#[cfg(not(test))]
+fn post_transcript_payload(_payload: serde_json::Value, _timeout: Duration) -> bool {
+    false
 }
 
 fn telemetry_status_is_permanent(status: u16) -> bool {
@@ -1446,85 +1265,24 @@ fn transcript_background_sender() -> &'static SyncSender<Value> {
 }
 
 #[cfg(test)]
-fn send_transcript_payload(payload: Value) -> bool {
-    if let Ok(mut emitted) = TEST_EMITTED_PAYLOADS.lock() {
-        emitted.push(payload);
-    }
-    true
+#[cfg(test)]
+fn send_transcript_payload(_payload: Value) -> bool {
+    false
 }
 
 #[cfg(not(test))]
-fn send_transcript_payload(payload: Value) -> bool {
-    match transcript_background_sender().try_send(payload) {
-        Ok(()) => true,
-        Err(TrySendError::Full(_)) => {
-            logging::warn("transcript upload queue is full; dropping transcript");
-            false
-        }
-        Err(TrySendError::Disconnected(_)) => {
-            logging::warn("transcript upload worker stopped; dropping transcript");
-            false
-        }
-    }
+fn send_transcript_payload(_payload: Value) -> bool {
+    false
 }
 
 #[cfg(test)]
-fn send_payload(mut payload: serde_json::Value, mode: DeliveryMode) -> bool {
-    concurrency::mark_legacy_concurrency_unavailable(&mut payload);
-    tests::TEST_DELIVERY_MODES.lock().unwrap().push(mode);
-    if let Ok(mut emitted) = TEST_EMITTED_PAYLOADS.lock() {
-        emitted.push(payload);
-    }
-    true
+fn send_payload(_payload: serde_json::Value, _mode: DeliveryMode) -> bool {
+    false
 }
 
 #[cfg(not(test))]
-fn send_payload(mut payload: serde_json::Value, mode: DeliveryMode) -> bool {
-    concurrency::mark_legacy_concurrency_unavailable(&mut payload);
-    match mode {
-        DeliveryMode::Background => {
-            if TELEMETRY_PERMANENTLY_REJECTED.load(Ordering::Relaxed) {
-                return false;
-            }
-            logging::debug("queueing telemetry payload for background delivery");
-            TELEMETRY_IN_FLIGHT.fetch_add(1, Ordering::AcqRel);
-            match background_sender().try_send(payload) {
-                Ok(()) => {
-                    TELEMETRY_QUEUE_OVERFLOW_WARNED.store(false, Ordering::Relaxed);
-                    true
-                }
-                Err(TrySendError::Full(_)) => {
-                    TELEMETRY_IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
-                    if !TELEMETRY_QUEUE_OVERFLOW_WARNED.swap(true, Ordering::Relaxed) {
-                        logging::warn(&format!(
-                            "telemetry background queue is full (capacity={BACKGROUND_QUEUE_CAPACITY}); dropping events until delivery catches up"
-                        ));
-                    }
-                    false
-                }
-                Err(TrySendError::Disconnected(_)) => {
-                    TELEMETRY_IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
-                    logging::warn("telemetry background worker stopped; dropping payload");
-                    false
-                }
-            }
-        }
-        DeliveryMode::Blocking(timeout) => {
-            logging::debug(&format!(
-                "sending telemetry payload with blocking timeout={}ms",
-                timeout.as_millis()
-            ));
-            if tokio::runtime::Handle::try_current().is_ok() {
-                let (tx, rx) = std::sync::mpsc::sync_channel(1);
-                std::thread::spawn(move || {
-                    let _ = tx.send(post_payload(payload, timeout));
-                });
-                rx.recv_timeout(timeout).unwrap_or(false)
-            } else {
-                post_payload(payload, timeout)
-            }
-        }
-    }
+fn send_payload(_payload: serde_json::Value, _mode: DeliveryMode) -> bool {
+    false
 }
 
 fn current_error_counts(state: &SessionTelemetry) -> ErrorCounts {
