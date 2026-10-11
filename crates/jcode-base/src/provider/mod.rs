@@ -1134,6 +1134,32 @@ impl MultiProvider {
             .then(|| (prefix.to_string(), rest.to_string()))
     }
 
+    /// Match a bare (unprefixed) model name against configured named provider profiles (JSON providers)
+    fn named_provider_profile_owning_model(model: &str) -> Option<String> {
+        let model = model.trim();
+        if model.is_empty() {
+            return None;
+        }
+        let config = crate::config::config();
+        if let Some(default_p) = config.provider.default_provider.as_deref() {
+            if let Some(p_cfg) = config.providers.get(default_p) {
+                if p_cfg.models.iter().any(|m| m.id.trim() == model)
+                    || p_cfg.default_model.as_deref().map(str::trim) == Some(model)
+                {
+                    return Some(default_p.to_string());
+                }
+            }
+        }
+        for (name, p_cfg) in &config.providers {
+            if p_cfg.models.iter().any(|m| m.id.trim() == model)
+                || p_cfg.default_model.as_deref().map(str::trim) == Some(model)
+            {
+                return Some(name.clone());
+            }
+        }
+        None
+    }
+
     /// Bind (or reuse) the runtime for a named config provider profile and
     /// select `model` on it (issue #444).
     fn set_model_on_named_provider_profile(&self, profile_name: &str, model: &str) -> Result<()> {
@@ -2209,6 +2235,11 @@ impl Provider for MultiProvider {
             Self::named_provider_profile_model_prefix(requested_model)
         {
             return self.set_model_on_named_provider_profile(&profile_name, &target_model);
+        }
+
+        // Direct matching for bare model names against named JSON provider profiles
+        if let Some(profile_name) = Self::named_provider_profile_owning_model(requested_model) {
+            return self.set_model_on_named_provider_profile(&profile_name, requested_model);
         }
 
         // Provider-prefixed model names are explicit routing directives. They

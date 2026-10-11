@@ -26,6 +26,16 @@ pub fn simplified_model_routes_for_picker(
     current_model: &str,
     display_models: impl IntoIterator<Item = String>,
 ) -> Vec<ModelRoute> {
+    // If user has configured named provider profiles (JSON providers from ~/.jcode/providers/*.json),
+    // strictly use them for pure and complete model listing!
+    let mut named_routes = Vec::new();
+    for (profile_name, profile_config) in &crate::config::config().providers {
+        named_routes.extend(named_provider_profile_routes(profile_name, profile_config));
+    }
+    if !named_routes.is_empty() {
+        return named_routes;
+    }
+
     let auth = AuthStatus::check_fast();
     let mut routes = Vec::new();
 
@@ -223,6 +233,22 @@ struct OpenRouterRouteStats {
 /// one place per provider instead of one 400-line function.
 pub(super) fn multiprovider_model_routes(provider: &MultiProvider) -> Vec<ModelRoute> {
     let routes_started = std::time::Instant::now();
+
+    // Pure and complete closure: if named JSON providers exist, surface ONLY those registered models
+    let mut json_routes = Vec::new();
+    for (profile_name, profile_config) in &crate::config::config().providers {
+        json_routes.extend(named_provider_profile_routes(profile_name, profile_config));
+    }
+    if !json_routes.is_empty() {
+        let total_ms = routes_started.elapsed().as_millis();
+        crate::logging::info(&format!(
+            "multiprovider_model_routes: assembled {} registered provider routes in {}ms",
+            json_routes.len(),
+            total_ms
+        ));
+        return json_routes;
+    }
+
     provider.spawn_anthropic_catalog_refresh_if_needed();
     provider.spawn_openai_catalog_refresh_if_needed();
 

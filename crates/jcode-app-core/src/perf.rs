@@ -271,25 +271,10 @@ pub fn tui_policy_for(
                 None
             }
         });
-    let fullscreen_transcript = env_fullscreen.unwrap_or_else(|| {
-        if profile.is_ssh {
-            false
-        } else {
-            display.fullscreen_transcript
-        }
-    });
+    let fullscreen_transcript = env_fullscreen.unwrap_or(display.fullscreen_transcript);
 
-    // Over SSH or in Scrollback mode, NEVER capture mouse so native terminal scroll & selection work!
-    let enable_mouse_capture = if !fullscreen_transcript || profile.is_ssh {
-        false
-    } else {
-        display.mouse_capture
-    };
-
-    if profile.is_ssh {
-        redraw_fps = redraw_fps.min(10);
-        enable_focus_change = false;
-    }
+    // Support mouse capture (wheel scrolling & clicks) natively across local, WSL, and SSH
+    let enable_mouse_capture = display.mouse_capture;
 
     if !enable_decorative_animations {
         animation_fps = 1;
