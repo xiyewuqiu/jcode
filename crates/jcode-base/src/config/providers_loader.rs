@@ -29,8 +29,10 @@ pub enum JsonModelEntry {
         id: String,
         #[serde(default)]
         name: Option<String>,
-        #[serde(default)]
+        #[serde(default, alias = "context_limit", alias = "context-length", alias = "context-window")]
         context_window: Option<usize>,
+        #[serde(default, alias = "max_output_tokens", alias = "max-tokens", alias = "max-output-tokens")]
+        max_tokens: Option<usize>,
     },
 }
 
@@ -45,30 +47,85 @@ pub fn providers_dir() -> anyhow::Result<PathBuf> {
 /// Ensure a default cline-pass.json exists if the providers folder is empty.
 pub fn ensure_default_provider_template(dir: &Path) {
     let cline_pass_path = dir.join("cline-pass.json");
-    if cline_pass_path.exists() {
-        return;
-    }
 
     // Try to recover any pre-existing Cline Pass API key from env or config file
     let recovered_key = std::env::var("CLINE_PASS_API_KEY").ok().or_else(|| {
         crate::provider_catalog::load_env_value_from_config_file("CLINE_PASS_API_KEY", "cline-pass.env")
     }).unwrap_or_default();
 
+    if cline_pass_path.exists() {
+        // If file exists, ensure cline-pass/deepseek-v4.1-flash is registered
+        if let Ok(content) = fs::read_to_string(&cline_pass_path) {
+            if !content.contains("deepseek-v4.1-flash") {
+                if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(models) = parsed.get_mut("models").and_then(|m| m.as_array_mut()) {
+                        let flash_model = serde_json::json!({
+                            "id": "cline-pass/deepseek-v4.1-flash",
+                            "name": "DeepSeek V4.1 Flash",
+                            "context_window": 1000000,
+                            "max_tokens": 384000
+                        });
+                        models.insert(0, flash_model);
+                        parsed["default_model"] = serde_json::Value::String("cline-pass/deepseek-v4.1-flash".to_string());
+                        if let Ok(formatted) = serde_json::to_string_pretty(&parsed) {
+                            let _ = fs::write(&cline_pass_path, formatted);
+                        }
+                    }
+                }
+            }
+        }
+        return;
+    }
+
     let template = serde_json::json!({
         "id": "cline-pass",
-        "name": "Cline Pass",
+        "name": "cline-pass",
         "api_base": "https://api.cline.bot/api/v1",
         "api_key": recovered_key,
-        "default_model": "mistralai/mistral-large-4-0",
+        "default_model": "cline-pass/deepseek-v4.1-flash",
         "models": [
-            { "id": "mistralai/mistral-large-4-0", "name": "Mistral Large 4.0" },
-            { "id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet" },
-            { "id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet" },
-            { "id": "gpt-4o", "name": "GPT-4o" },
-            { "id": "o3-mini", "name": "o3-mini" },
-            { "id": "deepseek-chat", "name": "DeepSeek V3" },
-            { "id": "deepseek-reasoner", "name": "DeepSeek R1" },
-            { "id": "qwen-2.5-coder-32b-instruct", "name": "Qwen 2.5 Coder 32B" }
+            {
+                "id": "cline-pass/deepseek-v4.1-flash",
+                "name": "DeepSeek V4.1 Flash",
+                "context_window": 1000000,
+                "max_tokens": 384000
+            },
+            {
+                "id": "claude-3-7-sonnet-20250219",
+                "name": "Claude 3.7 Sonnet",
+                "context_window": 200000,
+                "max_tokens": 64000
+            },
+            {
+                "id": "claude-3-5-sonnet-20241022",
+                "name": "Claude 3.5 Sonnet",
+                "context_window": 200000,
+                "max_tokens": 8192
+            },
+            {
+                "id": "gpt-4o",
+                "name": "GPT-4o",
+                "context_window": 128000,
+                "max_tokens": 16384
+            },
+            {
+                "id": "o3-mini",
+                "name": "o3-mini",
+                "context_window": 200000,
+                "max_tokens": 100000
+            },
+            {
+                "id": "deepseek-chat",
+                "name": "DeepSeek V3",
+                "context_window": 64000,
+                "max_tokens": 8192
+            },
+            {
+                "id": "deepseek-reasoner",
+                "name": "DeepSeek R1",
+                "context_window": 64000,
+                "max_tokens": 8192
+            }
         ]
     });
 
@@ -142,7 +199,7 @@ pub fn load_providers_from_directory() -> Vec<(String, NamedProviderConfig)> {
                         });
                     }
                 }
-                JsonModelEntry::Detailed { id, name: _, context_window } => {
+                JsonModelEntry::Detailed { id, name: _, context_window, max_tokens: _ } => {
                     let id_trimmed = id.trim().to_string();
                     if !id_trimmed.is_empty() {
                         models.push(NamedProviderModelConfig {

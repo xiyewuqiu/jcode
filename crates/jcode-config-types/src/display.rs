@@ -134,6 +134,9 @@ pub struct DisplayConfig {
     pub resume_project_scope: bool,
     /// Usage percentage wording: "left" (default) or "used".
     pub usage_display: String,
+    /// Codex-compatible model availability NUX counters: [tui.model_availability_nux]
+    #[serde(default)]
+    pub model_availability_nux: std::collections::BTreeMap<String, u32>,
 }
 impl Default for DisplayConfig {
     fn default() -> Self {
@@ -175,6 +178,7 @@ impl Default for DisplayConfig {
             external_sessions: true,
             resume_project_scope: false,
             usage_display: "left".to_string(),
+            model_availability_nux: std::collections::BTreeMap::new(),
         }
     }
 }
