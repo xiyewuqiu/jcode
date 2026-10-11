@@ -1156,7 +1156,22 @@ pub(super) async fn handle_notify_auth_changed(
                 latest_snapshot.clone(),
             ));
         } else {
-            if prefer_strongest {
+            if let Some(activated_model) = activation.activated_model.as_deref() {
+                // If a specific provider was just authenticated and has a designated model,
+                // keep that model instead of blindly hijacking to another unauthenticated provider!
+                if let Some(route) = latest_snapshot
+                    .model_routes
+                    .iter()
+                    .find(|r| r.available && r.model == activated_model)
+                {
+                    apply_auth_route_to_agent(
+                        route,
+                        &agent_clone,
+                        Some(auth_selection_generation),
+                    )
+                    .await;
+                }
+            } else if prefer_strongest {
                 if let Some(route) = crate::auth::lifecycle::globally_preferred_default_route(
                     &latest_snapshot.model_routes,
                 ) {

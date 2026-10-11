@@ -271,7 +271,13 @@ pub fn tui_policy_for(
                 None
             }
         });
-    let fullscreen_transcript = env_fullscreen.unwrap_or(display.fullscreen_transcript);
+    let fullscreen_transcript = env_fullscreen.unwrap_or_else(|| {
+        if profile.is_ssh {
+            false
+        } else {
+            display.fullscreen_transcript
+        }
+    });
 
     // Over SSH or in Scrollback mode, NEVER capture mouse so native terminal scroll & selection work!
     let enable_mouse_capture = if !fullscreen_transcript || profile.is_ssh {

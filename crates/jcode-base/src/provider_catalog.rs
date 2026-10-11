@@ -381,6 +381,16 @@ pub fn openai_compatible_profile_static_models(profile: OpenAiCompatibleProfile)
     };
 
     match profile.id {
+        "cline-pass" => {
+            push("mistralai/mistral-large-4-0");
+            push("claude-3-7-sonnet-20250219");
+            push("claude-3-5-sonnet-20241022");
+            push("gpt-4o");
+            push("o3-mini");
+            push("deepseek-chat");
+            push("deepseek-reasoner");
+            push("qwen-2.5-coder-32b-instruct");
+        }
         "opencode" => {
             push("minimax-m2.7");
             push("kimi-k2.5");

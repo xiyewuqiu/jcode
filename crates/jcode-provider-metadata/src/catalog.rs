@@ -511,7 +511,7 @@ pub const CLINE_PASS_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile 
     api_key_env: "CLINE_PASS_API_KEY",
     env_file: "cline-pass.env",
     setup_url: "https://api.cline.bot",
-    default_model: None,
+    default_model: Some("mistralai/mistral-large-4-0"),
     requires_api_key: true,
 };
 

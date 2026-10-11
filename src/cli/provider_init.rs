@@ -19,6 +19,8 @@ pub(crate) use crate::external_auth::maybe_run_external_auth_auto_import_flow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum ProviderChoice {
+    #[value(alias = "cline")]
+    ClinePass,
     Jcode,
     /// Native Claude (Anthropic OAuth/API). `claude-subprocess` is kept as a
     /// hidden alias for old scripts; the Claude Code CLI subprocess transport
@@ -192,6 +194,7 @@ impl ProviderChoice {
             Self::Belvedir => "belvedir",
             Self::Orcarouter => "orcarouter",
             Self::AlibabaCodingPlan => "alibaba-coding-plan",
+            Self::ClinePass => "cline-pass",
             Self::OpenaiCompatible => "openai-compatible",
             Self::Cursor => "cursor",
             Self::Copilot => "copilot",
@@ -206,6 +209,10 @@ impl ProviderChoice {
 
 #[allow(deprecated)]
 const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescriptor)] = &[
+    (
+        ProviderChoice::ClinePass,
+        crate::provider_catalog::CLINE_PASS_LOGIN_PROVIDER,
+    ),
     (
         ProviderChoice::Jcode,
         crate::provider_catalog::JCODE_LOGIN_PROVIDER,
@@ -1273,6 +1280,7 @@ async fn init_provider_with_model_policy(
         | ProviderChoice::Belvedir
         | ProviderChoice::Orcarouter
         | ProviderChoice::AlibabaCodingPlan
+        | ProviderChoice::ClinePass
         | ProviderChoice::GeminiApi
         | ProviderChoice::OpenaiCompatible => {
             disable_subscription_runtime_mode();
