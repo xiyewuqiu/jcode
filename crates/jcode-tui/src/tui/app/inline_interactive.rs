@@ -1287,7 +1287,7 @@ impl App {
                 false,
             );
             if self.inline_interactive_state.is_some() {
-                self.set_status_notice("Updating model routes…");
+                self.set_status_notice("正在更新模型线路…");
             } else {
                 self.open_loading_model_picker(&current_model);
             }
@@ -1296,6 +1296,21 @@ impl App {
         }
 
         let routes_started = std::time::Instant::now();
+        // 关键防护：如果本地存在 JSON 模型配置，无论 local 还是 remote，严格且只显示本地 JSON 模型！
+        let local_json_routes = self.simplified_model_routes_for_picker(&current_model);
+        if !local_json_routes.is_empty() {
+            let routes_ms = routes_started.elapsed().as_millis();
+            let _ = self.open_model_picker_with_routes(
+                cache_signature,
+                picker_started,
+                local_json_routes,
+                routes_ms,
+                preserve_input,
+                false,
+            );
+            return;
+        }
+
         let routes: Vec<crate::provider::ModelRoute> = if self.is_remote {
             if !self.remote_model_options.is_empty() {
                 let mut routes = std::mem::take(&mut self.remote_model_options);
@@ -1336,7 +1351,7 @@ impl App {
                     false,
                 );
                 if self.inline_interactive_state.is_some() {
-                    self.set_status_notice("Updating model routes…");
+                    self.set_status_notice("正在更新模型线路…");
                 } else {
                     self.open_loading_model_picker(&current_model);
                 }
@@ -1377,7 +1392,7 @@ impl App {
 
     fn open_loading_model_picker(&mut self, current_model: &str) {
         let model_label = if current_model.trim().is_empty() || current_model == "unknown" {
-            "Loading models…".to_string()
+            "正在加载模型…".to_string()
         } else {
             current_model.to_string()
         };
@@ -1391,7 +1406,7 @@ impl App {
                     provider: self.provider.name().to_string(),
                     api_method: "current".to_string(),
                     available: true,
-                    detail: "updating model list…".to_string(),
+                    detail: "正在更新模型列表…".to_string(),
                     estimated_reference_cost_micros: None,
                 }],
                 action: PickerAction::Model,
@@ -1411,7 +1426,7 @@ impl App {
             filter: String::new(),
             preview: false,
         });
-        self.set_status_notice("Updating model list…");
+        self.set_status_notice("正在更新模型列表…");
     }
 
     fn start_model_picker_route_load(

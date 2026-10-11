@@ -475,7 +475,7 @@ fn source_update_check_status(result: anyhow::Result<Option<bool>>) -> crate::bu
                 "no upstream configured for the source checkout (local branch or detached HEAD)"
                     .to_string(),
         },
-        Err(error) => UpdateStatus::Error(format!("Source update check failed: {error:#}")),
+        Err(error) => UpdateStatus::Error(format!("源码更新检查失败: {error:#}")),
     }
 }
 

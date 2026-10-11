@@ -1203,16 +1203,28 @@ fn update_cline_pass_key(key: &str) -> anyhow::Result<()> {
     let path = dir.join("cline-pass.json");
     let mut def = if path.exists() {
         let content = std::fs::read_to_string(&path)?;
-        serde_json::from_str::<serde_json::Value>(&content)
-            .unwrap_or_else(|_| serde_json::json!({}))
+        let mut parsed = serde_json::from_str::<serde_json::Value>(&content)
+            .unwrap_or_else(|_| serde_json::json!({}));
+        parsed["default_model"] = serde_json::Value::String("cline-pass/deepseek-v4.1-flash".to_string());
+        if let Some(models) = parsed.get_mut("models").and_then(|m| m.as_array_mut()) {
+            if !models.iter().any(|m| m.get("id").and_then(|id| id.as_str()) == Some("cline-pass/deepseek-v4.1-flash")) {
+                models.insert(0, serde_json::json!({
+                    "id": "cline-pass/deepseek-v4.1-flash",
+                    "name": "DeepSeek V4.1 Flash",
+                    "context_window": 1000000,
+                    "max_tokens": 384000
+                }));
+            }
+        }
+        parsed
     } else {
         serde_json::json!({
             "id": "cline-pass",
             "name": "Cline Pass",
             "api_base": "https://api.cline.bot/api/v1",
-            "default_model": "mistralai/mistral-large-4-0",
+            "default_model": "cline-pass/deepseek-v4.1-flash",
             "models": [
-                { "id": "mistralai/mistral-large-4-0", "name": "Mistral Large 4.0" },
+                { "id": "cline-pass/deepseek-v4.1-flash", "name": "DeepSeek V4.1 Flash", "context_window": 1000000, "max_tokens": 384000 },
                 { "id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet" },
                 { "id": "gpt-4o", "name": "GPT-4o" },
                 { "id": "deepseek-chat", "name": "DeepSeek V3" }

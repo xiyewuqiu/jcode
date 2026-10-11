@@ -45,7 +45,7 @@ impl App {
         note: impl Into<String>,
     ) -> String {
         let note = note.into();
-        let mut content = format!("Status: {}", status.into());
+        let mut content = format!("状态: {}", status.into());
         if !note.is_empty() {
             content.push_str("\n\n");
             content.push_str(&note);
@@ -228,12 +228,12 @@ impl App {
                 } else {
                     // One line only: the full error is already in the log.
                     let reason = crate::update::summarize_update_error(&error);
-                    self.set_status_notice(format!("Update failed: {reason}"));
+                    self.set_status_notice(format!("更新状态: 失败 ({reason})"));
                     self.set_client_maintenance_message(
                         action,
                         Self::client_maintenance_card_message(
                             action,
-                            format!("failed ({reason})"),
+                            format!("失败 ({reason})"),
                             "",
                         ),
                     );
@@ -395,10 +395,10 @@ impl App {
                 }
                 // One line only: the full error is already in the log.
                 let reason = crate::update::summarize_update_error(&message);
-                self.set_status_notice(format!("{} failed: {reason}", action.title()));
+                self.set_status_notice(format!("{} 失败: {reason}", action.title()));
                 self.set_client_maintenance_message(
                     action,
-                    Self::client_maintenance_card_message(action, format!("failed ({reason})"), ""),
+                    Self::client_maintenance_card_message(action, format!("失败 ({reason})"), ""),
                 );
             }
         }

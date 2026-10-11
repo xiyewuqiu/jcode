@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use crate::auth::{AuthState, AuthStatus};
 
 use super::pricing::cheapness_for_route;
@@ -24,157 +26,35 @@ use super::{
 pub fn simplified_model_routes_for_picker(
     current_provider_name: &str,
     current_model: &str,
-    display_models: impl IntoIterator<Item = String>,
+    _display_models: impl IntoIterator<Item = String>,
 ) -> Vec<ModelRoute> {
-    // If user has configured named provider profiles (JSON providers from ~/.jcode/providers/*.json),
-    // strictly use them for pure and complete model listing!
+    // 严格且唯一：所有的模型只根据本地 JSON 配置文件显示！彻底删除所有先行强编码模型供应！
+    let loaded = crate::config::providers_loader::load_providers_from_directory();
     let mut named_routes = Vec::new();
-    for (profile_name, profile_config) in &crate::config::config().providers {
+    for (profile_name, profile_config) in &loaded {
         named_routes.extend(named_provider_profile_routes(profile_name, profile_config));
+    }
+    for (profile_name, profile_config) in &crate::config::config().providers {
+        if !loaded.iter().any(|(id, _)| id == profile_name) {
+            named_routes.extend(named_provider_profile_routes(profile_name, profile_config));
+        }
     }
     if !named_routes.is_empty() {
         return named_routes;
     }
 
-    let auth = AuthStatus::check_fast();
     let mut routes = Vec::new();
-
-    for model in display_models {
-        if model == CHATGPT_WEB_MODEL {
-            routes.push(build_chatgpt_web_route());
-            continue;
-        }
-        if !model.contains('/') && provider_for_model(&model) == Some("openai") {
-            // Platform-API-only GPT Pro models: never advertise an OAuth route.
-            if jcode_provider_core::is_openai_api_only_pro_model(&model) {
-                routes.push(ModelRoute {
-                    model: model.clone(),
-                    provider: "OpenAI".to_string(),
-                    api_method: "openai-api-key".to_string(),
-                    available: auth.openai_has_api_key,
-                    detail: if auth.openai_has_api_key {
-                        String::new()
-                    } else {
-                        "requires OPENAI_API_KEY".to_string()
-                    },
-                    usage: None,
-                    cheapness: None,
-                });
-                continue;
-            }
-            if auth.openai_has_oauth {
-                routes.push(ModelRoute {
-                    model: model.clone(),
-                    provider: "OpenAI".to_string(),
-                    api_method: "openai-oauth".to_string(),
-                    available: true,
-                    detail: String::new(),
-                    usage: None,
-                    cheapness: None,
-                });
-            }
-            if auth.openai_has_api_key {
-                routes.push(ModelRoute {
-                    model: model.clone(),
-                    provider: "OpenAI".to_string(),
-                    api_method: "openai-api-key".to_string(),
-                    available: true,
-                    detail: String::new(),
-                    usage: None,
-                    cheapness: None,
-                });
-            }
-            if auth.openai == AuthState::NotConfigured {
-                routes.push(ModelRoute {
-                    model,
-                    provider: "OpenAI".to_string(),
-                    api_method: "openai-oauth".to_string(),
-                    available: false,
-                    detail: "no credentials".to_string(),
-                    usage: None,
-                    cheapness: None,
-                });
-            }
-            continue;
-        }
-
-        let (provider, api_method, available, detail) =
-            if super::bedrock::BedrockProvider::is_bedrock_model_id(&model) {
-                (
-                    "AWS Bedrock".to_string(),
-                    "bedrock".to_string(),
-                    auth.bedrock != AuthState::NotConfigured,
-                    if auth.bedrock == AuthState::NotConfigured {
-                        "no Bedrock credentials or region; run /login bedrock".to_string()
-                    } else {
-                        String::new()
-                    },
-                )
-            } else if model.contains('/') {
-                (
-                    "auto".to_string(),
-                    "openrouter".to_string(),
-                    auth.openrouter != AuthState::NotConfigured,
-                    "simplified catalog".to_string(),
-                )
-            } else {
-                match provider_for_model(&model) {
-                    Some("claude") => {
-                        append_simplified_anthropic_model_routes(&mut routes, model, &auth);
-                        continue;
-                    }
-                    Some("openai") => unreachable!("OpenAI models are handled above"),
-                    Some("gemini") => (
-                        "Gemini".to_string(),
-                        "code-assist-oauth".to_string(),
-                        auth.gemini != AuthState::NotConfigured,
-                        String::new(),
-                    ),
-                    Some("cursor") => (
-                        "Cursor".to_string(),
-                        "cursor".to_string(),
-                        auth.cursor != AuthState::NotConfigured,
-                        String::new(),
-                    ),
-                    Some("openrouter") => (
-                        "auto".to_string(),
-                        "openrouter".to_string(),
-                        auth.openrouter != AuthState::NotConfigured,
-                        "simplified catalog".to_string(),
-                    ),
-                    Some(other) => (other.to_string(), other.to_string(), true, String::new()),
-                    None => (
-                        current_provider_name.to_string(),
-                        "current".to_string(),
-                        true,
-                        String::new(),
-                    ),
-                }
-            };
-
-        routes.push(ModelRoute {
-            model,
-            provider,
-            api_method,
-            available,
-            detail,
-            usage: None,
-            cheapness: None,
-        });
-    }
-
-    if routes.is_empty() && !current_model.is_empty() && current_model != "unknown" {
+    if !current_model.is_empty() && current_model != "unknown" {
         routes.push(ModelRoute {
             model: current_model.to_string(),
             provider: current_provider_name.to_string(),
             api_method: "current".to_string(),
             available: true,
-            detail: "simplified catalog".to_string(),
+            detail: "configured model".to_string(),
             usage: None,
             cheapness: None,
         });
     }
-
     routes
 }
 
@@ -231,125 +111,27 @@ struct OpenRouterRouteStats {
 /// Orchestration only: each provider family contributes routes through its
 /// own `append_*_routes` builder below, so provider-specific policy stays in
 /// one place per provider instead of one 400-line function.
-pub(super) fn multiprovider_model_routes(provider: &MultiProvider) -> Vec<ModelRoute> {
+pub(super) fn multiprovider_model_routes(_provider: &MultiProvider) -> Vec<ModelRoute> {
     let routes_started = std::time::Instant::now();
 
-    // Pure and complete closure: if named JSON providers exist, surface ONLY those registered models
+    // 严格且唯一：所有的模型只根据本地 JSON 配置文件显示！彻底删除所有先行强编码模型供应！
+    let loaded = crate::config::providers_loader::load_providers_from_directory();
     let mut json_routes = Vec::new();
-    for (profile_name, profile_config) in &crate::config::config().providers {
+    for (profile_name, profile_config) in &loaded {
         json_routes.extend(named_provider_profile_routes(profile_name, profile_config));
     }
-    if !json_routes.is_empty() {
-        let total_ms = routes_started.elapsed().as_millis();
-        crate::logging::info(&format!(
-            "multiprovider_model_routes: assembled {} registered provider routes in {}ms",
-            json_routes.len(),
-            total_ms
-        ));
-        return json_routes;
-    }
-
-    provider.spawn_anthropic_catalog_refresh_if_needed();
-    provider.spawn_openai_catalog_refresh_if_needed();
-
-    let mut routes = Vec::new();
-    let mut openrouter_stats = OpenRouterRouteStats::default();
-
-    let has_oauth = crate::auth::claude::load_credentials().is_ok();
-    let has_api_key = crate::provider::anthropic::has_anthropic_api_key();
-    let openai_auth = crate::auth::AuthStatus::check_fast();
-
-    append_anthropic_routes(provider, &mut routes, has_oauth, has_api_key);
-    append_openai_routes(provider, &mut routes, &openai_auth);
-    let added_direct_openai_compatible_routes =
-        append_openai_compatible_profile_routes(provider, &mut routes);
-    append_copilot_routes(provider, &mut routes);
-    append_gemini_routes(provider, &mut routes);
-    append_antigravity_routes(provider, &mut routes);
-    append_cursor_routes(provider, &mut routes);
-    append_bedrock_routes(provider, &mut routes);
-
-    let has_openrouter_transport = provider.openrouter_provider().is_some();
-    let has_openrouter_provider_features = provider
-        .openrouter_provider()
-        .map(|openrouter| openrouter.supports_provider_routing_features())
-        .unwrap_or(false);
-    append_openrouter_routes(provider, &mut routes, &mut openrouter_stats);
-
-    if !has_openrouter_transport && !added_direct_openai_compatible_routes {
-        // OpenRouter not configured - show a placeholder as unavailable.
-        routes.push(ModelRoute {
-            model: "openrouter models".to_string(),
-            provider: "—".to_string(),
-            api_method: "openrouter".to_string(),
-            available: false,
-            detail: "OPENROUTER_API_KEY not set".to_string(),
-            usage: None,
-            cheapness: None,
-        });
-    }
-
-    if has_openrouter_provider_features {
-        append_openrouter_alternative_routes(&mut routes, &mut openrouter_stats);
-    }
-
-    let total_ms = routes_started.elapsed().as_millis();
-    if total_ms >= 250 || std::env::var("JCODE_LOG_MODEL_PICKER_TIMING").is_ok() {
-        crate::logging::info(&format!(
-            "[TIMING] model_routes: routes={}, openrouter_configured={}, openrouter_models={}, openrouter_endpoint_cache_hits={}, openrouter_endpoint_routes={}, openrouter_scheduled_endpoint_refreshes={}, total={}ms",
-            routes.len(),
-            has_openrouter_provider_features,
-            openrouter_stats.models,
-            openrouter_stats.endpoint_cache_hits,
-            openrouter_stats.endpoint_routes,
-            openrouter_stats.scheduled_endpoint_refreshes,
-            total_ms,
-        ));
-    }
-
-    let routes_before_filter = routes.len();
-
-    // Drop obviously non-chat models (embeddings, speech, rerankers, etc.) that
-    // some providers (Bedrock, OpenAI-compatible profiles like NVIDIA NIM / FPT
-    // / Chutes) dump wholesale into their catalogs. Without this the picker is
-    // flooded with hundreds of unusable entries.
-    routes.retain(|route| is_listable_model_name(&route.model));
-
-    let mut routes = dedupe_model_routes(routes);
-
-    // Structured, always-on summary of catalog route building. This is the
-    // single most useful line for the recurring "model picker empty / only
-    // OpenAI+Anthropic appear / configured provider's models missing" reports
-    // (issues #292, #268, #312, #304): it records which credentials were
-    // detected and how many routes each provider contributed, so a shared log
-    // explains exactly why a model was or was not offered. No secrets here.
-    log_model_routes_summary(
-        "build",
-        &routes,
-        routes_before_filter,
-        has_oauth,
-        has_api_key,
-        openai_auth.openai_has_oauth,
-        openai_auth.openai_has_api_key,
-        has_openrouter_provider_features,
-        has_openrouter_provider_features,
-        added_direct_openai_compatible_routes,
-        total_ms,
-    );
-
-    if let Some(grok) = ProviderRegistry::new(provider).compatible_profile(GROK_BUILD_PROFILE_ID) {
-        for mut route in grok.model_routes() {
-            route.model = format!("grok-build:{}", route.model);
-            route.provider = "Grok Build".to_string();
-            route.api_method = "grok-build-acp".to_string();
-            if !routes.iter().any(|existing| {
-                existing.model == route.model && existing.api_method == route.api_method
-            }) {
-                routes.push(route);
-            }
+    for (profile_name, profile_config) in &crate::config::config().providers {
+        if !loaded.iter().any(|(id, _)| id == profile_name) {
+            json_routes.extend(named_provider_profile_routes(profile_name, profile_config));
         }
     }
-    routes
+    let total_ms = routes_started.elapsed().as_millis();
+    crate::logging::info(&format!(
+        "multiprovider_model_routes: assembled {} registered provider routes in {}ms",
+        json_routes.len(),
+        total_ms
+    ));
+    json_routes
 }
 
 /// Anthropic models via OAuth and/or API key.

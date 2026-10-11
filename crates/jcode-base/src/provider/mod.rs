@@ -1990,43 +1990,43 @@ impl Provider for MultiProvider {
     }
 
     fn model(&self) -> String {
+        let default_config_model = crate::config::config().provider.default_model.as_deref();
         match self.active_provider() {
             ActiveProvider::Claude => {
-                // Prefer anthropic if available
                 if let Some(anthropic) = self.anthropic_provider() {
                     anthropic.model()
                 } else {
-                    jcode_provider_core::DEFAULT_CLAUDE_MODEL.to_string()
+                    default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()
                 }
             }
             ActiveProvider::OpenAI => self
                 .openai_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| jcode_provider_core::DEFAULT_OPENAI_MODEL.to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()),
             ActiveProvider::Copilot => self
                 .copilot_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| "claude-sonnet-4".to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("claude-sonnet-4").to_string()),
             ActiveProvider::Antigravity => self
                 .antigravity_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| "default".to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("default").to_string()),
             ActiveProvider::Gemini => self
                 .gemini_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| "gemini-2.5-pro".to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("gemini-2.5-pro").to_string()),
             ActiveProvider::Cursor => self
                 .cursor_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| "composer-2.5".to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("composer-2.5").to_string()),
             ActiveProvider::Bedrock => self
                 .bedrock_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| "anthropic.claude-3-5-sonnet-20241022-v2:0".to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| "anthropic/claude-sonnet-4".to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()),
         }
     }
 

@@ -1581,28 +1581,28 @@ impl App {
         openai_compatible_profile: Option<crate::provider_catalog::OpenAiCompatibleProfile>,
     ) {
         let model_hint = default_model
-            .map(|m| format!("Suggested default model: {}\n\n", m))
+            .map(|m| format!("推荐默认模型: {}\n\n", m))
             .unwrap_or_default();
         let endpoint_hint = endpoint
-            .map(|endpoint| format!("Endpoint: {}\n", endpoint))
+            .map(|endpoint| format!("接口端点: {}\n", endpoint))
             .unwrap_or_default();
         let prompt = if api_key_optional {
-            "Paste your API key below if your endpoint requires one. Press Enter to skip, or type /cancel to abort."
+            "如果您的接口端点需要密钥，请在下方粘贴 API Key。按回车跳过，或输入 /cancel 取消。"
         } else {
-            "Paste your API key below (it will be saved securely), or type /cancel to abort."
+            "请在下方粘贴您的 API Key 密钥（将安全保存），或输入 /cancel 取消。"
         };
         self.push_display_message(DisplayMessage::system(format!(
             "{} {}\n\n\
-             Setup docs: {}\n\
-             Stored variable: {}\n\
+             文档地址: {}\n\
+             存储环境变量: {}\n\
              {}\
              {}\n\
              {}",
             provider,
             if api_key_optional {
-                "Local Endpoint"
+                "本地端点"
             } else {
-                "API Key"
+                "API Key 密钥"
             },
             docs_url,
             key_name,
@@ -1611,9 +1611,9 @@ impl App {
             prompt,
         )));
         self.set_status_notice(if api_key_optional {
-            "Login: optional key..."
+            "登录: 可选密钥..."
         } else {
-            "Login: paste key..."
+            "登录: 请粘贴密钥..."
         });
         let provider_id = openai_compatible_profile
             .map(|profile| profile.id.to_string())

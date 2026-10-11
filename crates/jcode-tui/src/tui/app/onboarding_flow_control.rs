@@ -1518,7 +1518,7 @@ impl App {
         // Render a single tidy block with the two sections.
         let mut body = String::new();
         if !ready.is_empty() {
-            body.push_str("**Ready to use**\n");
+            body.push_str("**已就绪，可直接开始对话**\n");
             for row in &ready {
                 body.push_str(&format!("- ✓ {row}\n"));
             }
@@ -1527,22 +1527,22 @@ impl App {
             if !body.is_empty() {
                 body.push('\n');
             }
-            body.push_str("**Needs attention**\n");
+            body.push_str("**需要注意**\n");
             for row in &attention {
                 body.push_str(&format!("- ✕ {row}\n"));
             }
             let login = Self::onboarding_login_suggestion();
             let fix_hint = if looks_like_auth || !ready.is_empty() {
-                format!("Run {login} to fix a login, or /model to pick another.")
+                format!("运行 {login} 修复登录，或使用 /model 切换模型。")
             } else {
-                format!("Run {login} to add a login, or /model to pick another.")
+                format!("运行 {login} 配置供应商，或使用 /model 切换模型。")
             };
             body.push_str(&format!("\n{fix_hint}"));
         }
         if body.is_empty() {
             // Defensive: should not happen because the default model always
             // lands in one of the lists.
-            body.push_str("Type anything to start.");
+            body.push_str("输入任意内容即可开始。");
         }
         self.push_display_message(DisplayMessage::system(body.trim_end().to_string()));
 

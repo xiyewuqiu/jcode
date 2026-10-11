@@ -489,7 +489,7 @@ impl AuthLifecycleDriver {
         let mut transcript = Vec::new();
         if spec.auth_path.shows_paste_prompt() {
             transcript.push(format!(
-                "**{} API Key**\n\nSetup docs: {}\nStored variable: `{}`\nEndpoint: `{}`\nSuggested default model: `{}`\n\n**Paste your API key below** (it will be saved securely), or type `/cancel` to abort.",
+                "**{} API Key 密钥配置**\n\n文档地址: {}\n存储环境变量: `{}`\n接口端点: `{}`\n推荐默认模型: `{}`\n\n**请在下方粘贴您的 API Key 密钥**（将安全加密保存），或输入 `/cancel` 取消。",
                 spec.provider_label,
                 resolved.setup_url,
                 resolved.api_key_env,
@@ -497,13 +497,13 @@ impl AuthLifecycleDriver {
                 resolved.default_model.as_deref().unwrap_or("none")
             ));
             transcript.push(format!(
-                "**{} API key saved.**\n\nStored at `{}`.\nFetching models now. Jcode will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes.",
+                "**{} API Key 密钥已保存。**\n\n已存储至 `{}`。\n正在获取模型列表。Jcode 将自动切换至可用模型并在完成后更新目录。",
                 spec.provider_label,
                 self.sandbox.env_file_path(&resolved.env_file).display()
             ));
         } else {
             transcript.push(format!(
-                "**{} credentials detected.**\n\nCredential source: {:?}. Fetching models now.",
+                "**已检测到 {} 凭据。**\n\n凭据来源: {:?}。正在获取模型列表。",
                 spec.provider_label,
                 spec.auth_path.credential_source()
             ));

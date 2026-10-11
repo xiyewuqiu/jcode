@@ -41,12 +41,9 @@ impl Config {
     pub fn merge_providers_from_directory(&mut self) {
         let loaded = super::providers_loader::load_providers_from_directory();
         for (id, provider_cfg) in loaded {
-            let has_key = provider_cfg.api_key.is_some();
-            // Automatically promote this provider as default if none is set or current default has no credentials
-            if (self.provider.default_provider.as_deref().map_or(true, |p| p.trim().is_empty())
-                || self.provider.default_provider.as_deref() == Some("openai"))
-                && has_key
-            {
+            // Automatically promote this local JSON provider as default if none is set or current default is openai/claude
+            let current_def = self.provider.default_provider.as_deref().unwrap_or("").trim();
+            if current_def.is_empty() || current_def == "openai" || current_def == "claude" {
                 self.provider.default_provider = Some(id.clone());
                 if let Some(def_m) = &provider_cfg.default_model {
                     self.provider.default_model = Some(def_m.clone());

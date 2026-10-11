@@ -281,24 +281,14 @@ impl MultiProvider {
         } else if let Some(pref) = provider_state.default_provider_key() {
             if let Some(selection) = provider_state.default_provider_selection() {
                 let preferred = selection.active_provider();
-                let is_configured = provider_state
-                    .preferred_provider_is_configured(availability)
-                    .unwrap_or(false);
-                if is_configured {
-                    active = preferred;
-                    crate::logging::info(&format!(
-                        "Using preferred provider '{}' from config via {}",
-                        pref,
-                        provider_state
-                            .preferred_provider_display_label()
-                            .unwrap_or_else(|| selection.display_label())
-                    ));
-                } else {
-                    crate::logging::warn(&format!(
-                        "Preferred provider '{}' is not configured, using auto-detected default",
-                        pref
-                    ));
-                }
+                active = preferred;
+                crate::logging::info(&format!(
+                    "Using preferred provider '{}' from config via {}",
+                    pref,
+                    provider_state
+                        .preferred_provider_display_label()
+                        .unwrap_or_else(|| selection.display_label())
+                ));
             } else {
                 crate::logging::warn(&format!(
                     "Unknown default_provider '{}' in config (expected: claude|openai|copilot|antigravity|gemini|cursor|bedrock|openrouter or an OpenAI-compatible profile such as deepseek|comtegra|zai|openai-compatible)",

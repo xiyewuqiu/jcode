@@ -189,16 +189,16 @@ fn model_picker_top_hint(picker: &crate::tui::InlineInteractiveState) -> Option<
     if let Some(global) = agent_models_scope(picker) {
         return Some(match (global, is_swarm_agent_model_picker) {
             (true, false) => {
-                " GLOBAL DEFAULT: changes every session without its own choice · Ctrl+G this session instead"
+                " 全局默认: 所有未单独指定的会话生效 · Ctrl+G 仅当前会话"
             }
             (false, false) => {
-                " THIS SESSION ONLY: other sessions keep the global default · Ctrl+G global default"
+                " 仅当前会话: 其他会话保持全局默认 · Ctrl+G 设为全局默认"
             }
             (true, true) => {
-                " GLOBAL DEFAULT (all sessions) · Ctrl+G this session · swarm routing: /swarm-prompt"
+                " 全局默认 (所有会话) · Ctrl+G 当前会话 · Swarm 路由: /swarm-prompt"
             }
             (false, true) => {
-                " THIS SESSION ONLY · Ctrl+G global default · swarm routing: /swarm-prompt"
+                " 仅当前会话 · Ctrl+G 全局默认 · Swarm 路由: /swarm-prompt"
             }
         });
     }
@@ -213,7 +213,7 @@ fn model_picker_top_hint(picker: &crate::tui::InlineInteractiveState) -> Option<
             .any(|entry| matches!(entry.action, crate::tui::PickerAction::Model));
     if is_runtime_model_picker {
         Some(
-            " keys: Ctrl+O set default · Ctrl+N favorite · Shift+Tab switch active model to next favorite",
+            " 按键: Ctrl+O 设为默认 · Ctrl+N 收藏 · Shift+Tab 切换至下一个收藏",
         )
     } else {
         None
@@ -516,12 +516,12 @@ pub(super) fn model_suggestion_lines(
             String::new()
         };
         let navigation = if !picker.preview && picker.column > 0 {
-            "↑↓ route · ←→ column · Enter select · Esc cancel"
+            "↑↓ 切换线路 · ←→ 切换列 · Enter 确定 · Esc 取消"
         } else {
-            "↑↓ choose · Enter select · Esc cancel"
+            "↑↓ 选择 · Enter 确定 · Esc 取消"
         };
         let shortcuts = hint
-            .map(|hint| format!(" ·{}", hint.trim_start_matches(" keys:")))
+            .map(|hint| format!(" ·{}", hint.trim_start_matches(" 按键:").trim_start_matches(" keys:")))
             .unwrap_or_default();
         lines.push(Line::from(Span::styled(
             format!("{filter}{navigation}{shortcuts}"),
