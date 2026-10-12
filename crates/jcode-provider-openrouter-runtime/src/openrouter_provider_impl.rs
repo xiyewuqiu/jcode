@@ -121,29 +121,9 @@ impl Provider for OpenRouterProvider {
             })
             .collect();
 
-        let mut request_model = model.clone();
-        if self.api_base.contains("api.cline.bot") {
-            // Cline Pass subscription models MUST have `cline-pass/` prefix (e.g. `cline-pass/deepseek-v4.1-flash`).
-            // Otherwise the gateway treats it as a pay-as-you-go request and charges account balance.
-            if !request_model.contains('/') {
-                request_model = format!("cline-pass/{}", request_model);
-            }
-        } else if let Some(profile_id) = self.profile_id.as_deref() {
-            if profile_id != "cline-pass" {
-                let slash_prefix = format!("{}/", profile_id);
-                let colon_prefix = format!("{}:", profile_id);
-                if let Some(stripped) = request_model
-                    .strip_prefix(&slash_prefix)
-                    .or_else(|| request_model.strip_prefix(&colon_prefix))
-                {
-                    request_model = stripped.to_string();
-                }
-            }
-        }
-
         // Build request
         let mut request = serde_json::json!({
-            "model": request_model,
+            "model": model,
             "messages": api_messages,
             "stream": true,
         });

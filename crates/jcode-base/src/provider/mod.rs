@@ -1113,16 +1113,10 @@ impl MultiProvider {
             .then_some(provider)
     }
 
-    /// Parse a `<name>:<model>` or `<name>/<model>` spec whose prefix is a user-defined named
+    /// Parse a `<name>:<model>` spec whose prefix is a user-defined named
     /// provider profile from config (`[providers.<name>]`).
     fn named_provider_profile_model_prefix(model: &str) -> Option<(String, String)> {
-        let (prefix, rest) = if let Some(parts) = model.split_once(':') {
-            parts
-        } else if let Some(parts) = model.split_once('/') {
-            parts
-        } else {
-            return None;
-        };
+        let (prefix, rest) = model.split_once(':')?;
 
         if explicit_model_provider_prefix(model).is_some()
             || Self::openai_compatible_model_prefix(model).is_some()
@@ -1153,18 +1147,8 @@ impl MultiProvider {
             if entry_id == model {
                 return true;
             }
-            if let Some(stripped) = model.strip_prefix(&format!("{}/", provider_name)) {
-                if stripped == entry_id {
-                    return true;
-                }
-            }
             if let Some(stripped) = model.strip_prefix(&format!("{}:", provider_name)) {
                 if stripped == entry_id {
-                    return true;
-                }
-            }
-            if let Some(stripped) = entry_id.strip_prefix(&format!("{}/", provider_name)) {
-                if stripped == model {
                     return true;
                 }
             }
