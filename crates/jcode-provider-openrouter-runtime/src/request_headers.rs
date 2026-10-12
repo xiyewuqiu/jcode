@@ -75,3 +75,38 @@ pub(crate) fn apply_opencode_session_header(
 }
 
 pub(crate) const OPENCODE_SESSION_HEADER: &str = "x-opencode-session";
+
+pub(crate) fn is_cline_bot_api_base(api_base: &str) -> bool {
+    let Ok(url) = reqwest::Url::parse(api_base) else {
+        return false;
+    };
+    matches!(
+        url.host_str(),
+        Some(host) if host == "api.cline.bot" || host.ends_with(".cline.bot")
+    )
+}
+
+pub(crate) fn apply_cline_bot_headers(
+    req: reqwest::RequestBuilder,
+    api_base: &str,
+) -> reqwest::RequestBuilder {
+    if is_cline_bot_api_base(api_base) {
+        req.header("User-Agent", "Cline/4.1.16")
+            .header("X-Client-Type", "cline-vscode")
+            .header("X-Client-Version", "4.1.16")
+    } else {
+        req
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_cline_bot_api_base() {
+        assert!(is_cline_bot_api_base("https://api.cline.bot/api/v1"));
+        assert!(is_cline_bot_api_base("https://sub.cline.bot/v1"));
+        assert!(!is_cline_bot_api_base("https://api.openai.com/v1"));
+    }
+}

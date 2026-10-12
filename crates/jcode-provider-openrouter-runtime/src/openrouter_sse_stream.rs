@@ -228,6 +228,7 @@ async fn stream_response(
             .header("X-Title", "jcode");
     }
     req = apply_opencode_session_header(req, &api_base, conversation_id);
+    req = apply_cline_bot_headers(req, &api_base);
     req = apply_grok_cli_turn_headers(req, &auth, &model, conversation_id);
 
     let response = jcode_provider_core::transport::send_with_initial_response_timeout(

@@ -1231,7 +1231,14 @@ fn update_cline_pass_key(key: &str) -> anyhow::Result<()> {
             ]
         })
     };
-    def["api_key"] = serde_json::Value::String(key.trim().to_string());
+    let clean_key = key.trim();
+    let clean_key = clean_key
+        .strip_prefix("Bearer ")
+        .or_else(|| clean_key.strip_prefix("bearer "))
+        .unwrap_or(clean_key)
+        .trim();
+    let clean_key = clean_key.trim_matches('"').trim_matches('\'');
+    def["api_key"] = serde_json::Value::String(clean_key.to_string());
     std::fs::write(&path, serde_json::to_string_pretty(&def)?)?;
     Ok(())
 }

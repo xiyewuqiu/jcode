@@ -456,10 +456,22 @@ enum ProviderAuth {
 impl ProviderAuth {
     async fn apply(&self, req: reqwest::RequestBuilder) -> Result<reqwest::RequestBuilder> {
         match self {
-            Self::AuthorizationBearer { token, .. } => Ok(req.bearer_auth(token)),
+            Self::AuthorizationBearer { token, .. } => {
+                let clean = token.trim();
+                let clean = clean
+                    .strip_prefix("Bearer ")
+                    .or_else(|| clean.strip_prefix("bearer "))
+                    .unwrap_or(clean)
+                    .trim();
+                let clean = clean.trim_matches('"').trim_matches('\'');
+                Ok(req.bearer_auth(clean))
+            }
             Self::HeaderValue {
                 header_name, value, ..
-            } => Ok(req.header(header_name, value)),
+            } => {
+                let clean = value.trim().trim_matches('"').trim_matches('\'');
+                Ok(req.header(header_name, clean))
+            }
             Self::AzureEntra { .. } => {
                 let token = jcode_base::auth::azure::get_bearer_token().await?;
                 Ok(req.bearer_auth(token))
