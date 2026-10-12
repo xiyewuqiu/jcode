@@ -54,22 +54,38 @@ pub fn ensure_default_provider_template(dir: &Path) {
     }).unwrap_or_default();
 
     if cline_pass_path.exists() {
-        // If file exists, ensure cline-pass/deepseek-v4.1-flash is registered
         if let Ok(content) = fs::read_to_string(&cline_pass_path) {
-            if !content.contains("deepseek-v4.1-flash") {
-                if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(models) = parsed.get_mut("models").and_then(|m| m.as_array_mut()) {
-                        let flash_model = serde_json::json!({
-                            "id": "cline-pass/deepseek-v4.1-flash",
-                            "name": "DeepSeek V4.1 Flash",
-                            "context_window": 1000000,
-                            "max_tokens": 384000
-                        });
-                        models.insert(0, flash_model);
-                        parsed["default_model"] = serde_json::Value::String("cline-pass/deepseek-v4.1-flash".to_string());
-                        if let Ok(formatted) = serde_json::to_string_pretty(&parsed) {
-                            let _ = fs::write(&cline_pass_path, formatted);
+            if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(&content) {
+                let mut modified = false;
+                if let Some(def) = parsed.get("default_model").and_then(|v| v.as_str()) {
+                    if def == "cline-pass/deepseek-v4.1-flash" || def == "deepseek-v4.1-flash" {
+                        parsed["default_model"] = serde_json::Value::String("deepseek/deepseek-v4.1-flash".to_string());
+                        modified = true;
+                    }
+                }
+                if let Some(models) = parsed.get_mut("models").and_then(|m| m.as_array_mut()) {
+                    for m in models.iter_mut() {
+                        if let Some(id) = m.get("id").and_then(|v| v.as_str()) {
+                            let new_id = match id {
+                                "cline-pass/deepseek-v4.1-flash" | "deepseek-v4.1-flash" => Some("deepseek/deepseek-v4.1-flash"),
+                                "claude-3-7-sonnet-20250219" => Some("anthropic/claude-3-7-sonnet-20250219"),
+                                "claude-3-5-sonnet-20241022" => Some("anthropic/claude-3-5-sonnet-20241022"),
+                                "gpt-4o" => Some("openai/gpt-4o"),
+                                "o3-mini" => Some("openai/o3-mini"),
+                                "deepseek-chat" => Some("deepseek/deepseek-chat"),
+                                "deepseek-reasoner" => Some("deepseek/deepseek-reasoner"),
+                                _ => None,
+                            };
+                            if let Some(nid) = new_id {
+                                m["id"] = serde_json::Value::String(nid.to_string());
+                                modified = true;
+                            }
                         }
+                    }
+                }
+                if modified {
+                    if let Ok(formatted) = serde_json::to_string_pretty(&parsed) {
+                        let _ = fs::write(&cline_pass_path, formatted);
                     }
                 }
             }
@@ -82,46 +98,46 @@ pub fn ensure_default_provider_template(dir: &Path) {
         "name": "cline-pass",
         "api_base": "https://api.cline.bot/api/v1",
         "api_key": recovered_key,
-        "default_model": "cline-pass/deepseek-v4.1-flash",
+        "default_model": "deepseek/deepseek-v4.1-flash",
         "models": [
             {
-                "id": "cline-pass/deepseek-v4.1-flash",
+                "id": "deepseek/deepseek-v4.1-flash",
                 "name": "DeepSeek V4.1 Flash",
                 "context_window": 1000000,
                 "max_tokens": 384000
             },
             {
-                "id": "claude-3-7-sonnet-20250219",
+                "id": "anthropic/claude-3-7-sonnet-20250219",
                 "name": "Claude 3.7 Sonnet",
                 "context_window": 200000,
                 "max_tokens": 64000
             },
             {
-                "id": "claude-3-5-sonnet-20241022",
+                "id": "anthropic/claude-3-5-sonnet-20241022",
                 "name": "Claude 3.5 Sonnet",
                 "context_window": 200000,
                 "max_tokens": 8192
             },
             {
-                "id": "gpt-4o",
+                "id": "openai/gpt-4o",
                 "name": "GPT-4o",
                 "context_window": 128000,
                 "max_tokens": 16384
             },
             {
-                "id": "o3-mini",
+                "id": "openai/o3-mini",
                 "name": "o3-mini",
                 "context_window": 200000,
                 "max_tokens": 100000
             },
             {
-                "id": "deepseek-chat",
+                "id": "deepseek/deepseek-chat",
                 "name": "DeepSeek V3",
                 "context_window": 64000,
                 "max_tokens": 8192
             },
             {
-                "id": "deepseek-reasoner",
+                "id": "deepseek/deepseek-reasoner",
                 "name": "DeepSeek R1",
                 "context_window": 64000,
                 "max_tokens": 8192
@@ -266,5 +282,32 @@ mod tests {
         let parsed3: JsonProviderFile = serde_json::from_str(json_upper).unwrap();
         assert_eq!(parsed3.api_key.as_deref(), Some("sk-test-upper"));
     }
+
+    #[test]
+    fn test_ensure_default_provider_template_upgrades_legacy_model_ids() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cline_pass_path = temp_dir.path().join("cline-pass.json");
+        let legacy_content = r#"{
+            "id": "cline-pass",
+            "api_base": "https://api.cline.bot/api/v1",
+            "apiKey": "sk-my-secret-key",
+            "default_model": "cline-pass/deepseek-v4.1-flash",
+            "models": [
+                { "id": "cline-pass/deepseek-v4.1-flash", "name": "DeepSeek V4.1 Flash" },
+                { "id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet" }
+            ]
+        }"#;
+        std::fs::write(&cline_pass_path, legacy_content).unwrap();
+
+        ensure_default_provider_template(temp_dir.path());
+
+        let upgraded_str = std::fs::read_to_string(&cline_pass_path).unwrap();
+        let upgraded: serde_json::Value = serde_json::from_str(&upgraded_str).unwrap();
+        assert_eq!(upgraded["default_model"], "deepseek/deepseek-v4.1-flash");
+        assert_eq!(upgraded["models"][0]["id"], "deepseek/deepseek-v4.1-flash");
+        assert_eq!(upgraded["models"][1]["id"], "anthropic/claude-3-7-sonnet-20250219");
+        assert_eq!(upgraded["apiKey"], "sk-my-secret-key");
+    }
 }
+
 

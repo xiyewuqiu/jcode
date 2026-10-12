@@ -73,8 +73,8 @@ mod tests {
     #[test]
     fn test_model_nux_deepseek_flagship() {
         let counts = BTreeMap::new();
-        assert!(is_model_nux_eligible("cline-pass/deepseek-v4.1-flash", &counts));
-        let msg = model_nux_announcement("cline-pass/deepseek-v4.1-flash", &counts).unwrap();
+        assert!(is_model_nux_eligible("deepseek/deepseek-v4.1-flash", &counts));
+        let msg = model_nux_announcement("deepseek/deepseek-v4.1-flash", &counts).unwrap();
         assert!(msg.contains("新旗舰模型就绪"));
         assert!(msg.contains("剩余 4 次"));
     }

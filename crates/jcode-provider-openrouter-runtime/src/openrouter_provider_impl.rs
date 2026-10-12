@@ -121,19 +121,40 @@ impl Provider for OpenRouterProvider {
             })
             .collect();
 
-        let request_model = if let Some(profile_id) = self.profile_id.as_deref() {
+        let mut request_model = model.clone();
+        if let Some(stripped) = request_model
+            .strip_prefix("cline-pass/")
+            .or_else(|| request_model.strip_prefix("cline-pass:"))
+        {
+            request_model = stripped.to_string();
+        } else if let Some(profile_id) = self.profile_id.as_deref() {
             let slash_prefix = format!("{}/", profile_id);
             let colon_prefix = format!("{}:", profile_id);
-            if let Some(stripped) = model.strip_prefix(&slash_prefix) {
-                stripped.to_string()
-            } else if let Some(stripped) = model.strip_prefix(&colon_prefix) {
-                stripped.to_string()
-            } else {
-                model.clone()
+            if let Some(stripped) = request_model
+                .strip_prefix(&slash_prefix)
+                .or_else(|| request_model.strip_prefix(&colon_prefix))
+            {
+                request_model = stripped.to_string();
             }
-        } else {
-            model.clone()
-        };
+        }
+
+        // Cline Bot Gateway (api.cline.bot) enforces `modelType/model` format
+        if self.api_base.contains("api.cline.bot") && !request_model.contains('/') {
+            let lower = request_model.to_ascii_lowercase();
+            if lower.starts_with("deepseek") {
+                request_model = format!("deepseek/{}", request_model);
+            } else if lower.starts_with("claude") {
+                request_model = format!("anthropic/{}", request_model);
+            } else if lower.starts_with("gpt")
+                || lower.starts_with("o1")
+                || lower.starts_with("o3")
+                || lower.starts_with("o4")
+            {
+                request_model = format!("openai/{}", request_model);
+            } else if lower.starts_with("gemini") {
+                request_model = format!("google/{}", request_model);
+            }
+        }
 
         // Build request
         let mut request = serde_json::json!({
