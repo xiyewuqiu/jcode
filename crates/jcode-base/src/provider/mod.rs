@@ -2031,13 +2031,13 @@ impl Provider for MultiProvider {
                 if let Some(anthropic) = self.anthropic_provider() {
                     anthropic.model()
                 } else {
-                    default_config_model.unwrap_or("deepseek/deepseek-v4.1-flash").to_string()
+                    default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()
                 }
             }
             ActiveProvider::OpenAI => self
                 .openai_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| default_config_model.unwrap_or("deepseek/deepseek-v4.1-flash").to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()),
             ActiveProvider::Copilot => self
                 .copilot_provider()
                 .map(|o| o.model())
@@ -2057,11 +2057,11 @@ impl Provider for MultiProvider {
             ActiveProvider::Bedrock => self
                 .bedrock_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| default_config_model.unwrap_or("deepseek/deepseek-v4.1-flash").to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|o| o.model())
-                .unwrap_or_else(|| default_config_model.unwrap_or("deepseek/deepseek-v4.1-flash").to_string()),
+                .unwrap_or_else(|| default_config_model.unwrap_or("cline-pass/deepseek-v4.1-flash").to_string()),
         }
     }
 

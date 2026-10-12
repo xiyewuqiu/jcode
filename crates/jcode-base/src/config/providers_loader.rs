@@ -58,8 +58,8 @@ pub fn ensure_default_provider_template(dir: &Path) {
             if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(&content) {
                 let mut modified = false;
                 if let Some(def) = parsed.get("default_model").and_then(|v| v.as_str()) {
-                    if def == "cline-pass/deepseek-v4.1-flash" || def == "deepseek-v4.1-flash" {
-                        parsed["default_model"] = serde_json::Value::String("deepseek/deepseek-v4.1-flash".to_string());
+                    if def == "deepseek/deepseek-v4.1-flash" || def == "deepseek-v4.1-flash" {
+                        parsed["default_model"] = serde_json::Value::String("cline-pass/deepseek-v4.1-flash".to_string());
                         modified = true;
                     }
                 }
@@ -67,7 +67,7 @@ pub fn ensure_default_provider_template(dir: &Path) {
                     for m in models.iter_mut() {
                         if let Some(id) = m.get("id").and_then(|v| v.as_str()) {
                             let new_id = match id {
-                                "cline-pass/deepseek-v4.1-flash" | "deepseek-v4.1-flash" => Some("deepseek/deepseek-v4.1-flash"),
+                                "deepseek/deepseek-v4.1-flash" | "deepseek-v4.1-flash" => Some("cline-pass/deepseek-v4.1-flash"),
                                 "claude-3-7-sonnet-20250219" => Some("anthropic/claude-3-7-sonnet-20250219"),
                                 "claude-3-5-sonnet-20241022" => Some("anthropic/claude-3-5-sonnet-20241022"),
                                 "gpt-4o" => Some("openai/gpt-4o"),
@@ -98,10 +98,10 @@ pub fn ensure_default_provider_template(dir: &Path) {
         "name": "cline-pass",
         "api_base": "https://api.cline.bot/api/v1",
         "api_key": recovered_key,
-        "default_model": "deepseek/deepseek-v4.1-flash",
+        "default_model": "cline-pass/deepseek-v4.1-flash",
         "models": [
             {
-                "id": "deepseek/deepseek-v4.1-flash",
+                "id": "cline-pass/deepseek-v4.1-flash",
                 "name": "DeepSeek V4.1 Flash",
                 "context_window": 1000000,
                 "max_tokens": 384000
@@ -303,8 +303,8 @@ mod tests {
 
         let upgraded_str = std::fs::read_to_string(&cline_pass_path).unwrap();
         let upgraded: serde_json::Value = serde_json::from_str(&upgraded_str).unwrap();
-        assert_eq!(upgraded["default_model"], "deepseek/deepseek-v4.1-flash");
-        assert_eq!(upgraded["models"][0]["id"], "deepseek/deepseek-v4.1-flash");
+        assert_eq!(upgraded["default_model"], "cline-pass/deepseek-v4.1-flash");
+        assert_eq!(upgraded["models"][0]["id"], "cline-pass/deepseek-v4.1-flash");
         assert_eq!(upgraded["models"][1]["id"], "anthropic/claude-3-7-sonnet-20250219");
         assert_eq!(upgraded["apiKey"], "sk-my-secret-key");
     }

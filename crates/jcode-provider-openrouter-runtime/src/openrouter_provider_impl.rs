@@ -122,37 +122,22 @@ impl Provider for OpenRouterProvider {
             .collect();
 
         let mut request_model = model.clone();
-        if let Some(stripped) = request_model
-            .strip_prefix("cline-pass/")
-            .or_else(|| request_model.strip_prefix("cline-pass:"))
-        {
-            request_model = stripped.to_string();
-        } else if let Some(profile_id) = self.profile_id.as_deref() {
-            let slash_prefix = format!("{}/", profile_id);
-            let colon_prefix = format!("{}:", profile_id);
-            if let Some(stripped) = request_model
-                .strip_prefix(&slash_prefix)
-                .or_else(|| request_model.strip_prefix(&colon_prefix))
-            {
-                request_model = stripped.to_string();
+        if self.api_base.contains("api.cline.bot") {
+            // Cline Pass subscription models MUST have `cline-pass/` prefix (e.g. `cline-pass/deepseek-v4.1-flash`).
+            // Otherwise the gateway treats it as a pay-as-you-go request and charges account balance.
+            if !request_model.contains('/') {
+                request_model = format!("cline-pass/{}", request_model);
             }
-        }
-
-        // Cline Bot Gateway (api.cline.bot) enforces `modelType/model` format
-        if self.api_base.contains("api.cline.bot") && !request_model.contains('/') {
-            let lower = request_model.to_ascii_lowercase();
-            if lower.starts_with("deepseek") {
-                request_model = format!("deepseek/{}", request_model);
-            } else if lower.starts_with("claude") {
-                request_model = format!("anthropic/{}", request_model);
-            } else if lower.starts_with("gpt")
-                || lower.starts_with("o1")
-                || lower.starts_with("o3")
-                || lower.starts_with("o4")
-            {
-                request_model = format!("openai/{}", request_model);
-            } else if lower.starts_with("gemini") {
-                request_model = format!("google/{}", request_model);
+        } else if let Some(profile_id) = self.profile_id.as_deref() {
+            if profile_id != "cline-pass" {
+                let slash_prefix = format!("{}/", profile_id);
+                let colon_prefix = format!("{}:", profile_id);
+                if let Some(stripped) = request_model
+                    .strip_prefix(&slash_prefix)
+                    .or_else(|| request_model.strip_prefix(&colon_prefix))
+                {
+                    request_model = stripped.to_string();
+                }
             }
         }
 
